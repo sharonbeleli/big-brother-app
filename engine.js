@@ -83,7 +83,7 @@
         { crisis: { level: c.level, type: c.type || "self", hotlines: BB.getHotlines(this.country) } });
     }
     if (this.s.locked) return Object.assign(this.out([{ text: F.locked }]), { crisis: { level: 0, reminder: true, hotlines: BB.getHotlines(this.country) } });
-    const t = norm(raw);
+    const t = norm(raw); this.lastRaw = raw;
     if (raw === "action:forget") { if (this.mem) this.mem.forget(); this.s = { stage: "welcome", answers: {}, hist: [], dk: 0, qi: 0, elab: 0 }; return Object.assign(this.start(), { forgotten: true }); }
     if (raw === "action:human") return this.handoff();
     if (raw === "action:new") { this.s.stage = "topic"; return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips()); }
@@ -159,7 +159,7 @@
     for (const k in W) { r -= W[k]; if (r < 0 && W[k] > 0) { mv = k; break; } }
     this.moves.push(mv); this.lastMove = mv;
     const n = this.myName(), nq = (n && this.rnd() < 0.3 ? n + ", " : "") + q, m = [];
-    const occ = this.profile().occupation, hook = (F.occupation_hooks || {})[occ];
+    const occ = this.profile().occupation, hook = this.hookFor(occ);
     switch (mv) {
       case "short": m.push({ text: nq }); break;
       case "reflect": m.push({ text: this.fmt(this.pick(M.reflect)) + (hook && this.rnd() < 0.5 ? "\n" + hook : ""), kind: "insight" }, { text: q }); break;
@@ -172,6 +172,11 @@
     }
     return m;
   };
+  P.sessionText = function () { return norm(Object.values(this.s.answers || {}).join(" ") + " " + (this.s.say || []).join(" ")); };
+  P.knownParty = function () { const t = " " + this.sessionText() + " "; for (const k of this.C.flows.parties || []) if (t.includes(norm(k))) return k; return null; };
+  P.hookFor = function (occ) { const F = this.C.flows, h = (F.occupation_hooks || {})[occ]; if (!h) return null;
+    const bad = (F.occupation_conflicts || {})[occ] || [], t = this.sessionText() + " " + norm(this.lastRaw || "");
+    return bad.some(b => t.includes(norm(b))) ? null : h; };
   P.bestCase = function () { const all = this.C.cases.filter(c => c.topics.includes(this.s.topic) && !(this.s.usedCases || []).includes(c.id)); return all.length ? all[this.rint(all.length)] : null; };
   P.caseFor = function () { const a = this.analogy(); return a || this.bestCase(); };
   P.st_questions = function (raw) {
@@ -182,10 +187,17 @@
     const q = Q[this.s.order[this.s.qi]]; this.s.answers[q.id] = ((this.s.answers[q.id] || "") + " " + raw).trim(); // session-only, never persisted
     this.rememberPhrase(raw);
     this.s.qi++; this.s.elab = 0;
-    if (this.s.qi < Q.length) return this.out(this.compose(this.pick(Q[this.s.order[this.s.qi]].t)));
+    const pre = [];
+    if (this.s.qi < Q.length && Q[this.s.order[this.s.qi]].id === "who") {
+      const party = this.knownParty();
+      if (party) { this.s.answers.who = party; pre.push({ text: this.fmt(this.pick(F.who_known), { party }) }); this.moves.push("reference"); this.s.qi++; }
+    }
+    if (this.s.qi < Q.length) return this.out(pre.concat(this.compose(this.pick(Q[this.s.order[this.s.qi]].t))));
     this.s.stage = "reflection";
+    if (pre.length) this.s.preReflect = pre;
     const a = this.analogy(), m = [{ text: this.pick(F.topics[this.s.topic].insight), kind: "insight" }];
     if (a) this.s.usedCases.push(a.id);
+    if (this.s.preReflect) { m.unshift(...this.s.preReflect); this.s.preReflect = null; }
     if (a) m.push({ text: this.pick(F.analogy_intro) + " " + a.analogy, kind: "analogy", caseId: a.id });
     m.push({ text: this.pick(F.insight_followup) });
     return Object.assign(this.out(m, [{ label: "כן, מתאים", value: "כן זה מתאים לי, זה באמת מה שקורה" }, { label: "לא בדיוק", value: "לא בדיוק, אצלי זה קצת אחרת" }]), { analogyCase: a && a.id });
