@@ -20,12 +20,28 @@
     this.rnd = opts.random || Math.random; this.handoffCfg = opts.handoff || BB.HANDOFF;
     this.country = opts.country || "IL";
     this.s = { stage: "welcome", sub: null, topic: null, qi: 0, elab: 0, answers: {}, hist: [], dk: 0, locked: false, pendingAnger: false };
+    this.used = {}; this.tplLog = []; this.moves = []; this.lastMove = null; this.turns = [];
     this.hidden = { motivation: 0, ability: 0, style: null, personType: null }; // internal only
   }
   const P = Engine.prototype;
-  P.pick = function (arr) { return Array.isArray(arr) ? arr[Math.floor(this.rnd() * arr.length) % arr.length] : arr; };
-  P.fmt = function (t, v) { return String(t).replace(/\{(\w+)\}/g, (_, k) => (v && v[k] != null ? v[k] : "")); };
+  // Session-aware picker: never reuse a template until all variants of that slot are exhausted; never repeat the last one.
+  P.pick = function (arr) {
+    if (!Array.isArray(arr)) return arr; const key = arr[0];
+    const u = this.used[key] || (this.used[key] = { seen: [], last: -1 });
+    let avail = arr.map((_, i) => i).filter(i => !u.seen.includes(i));
+    if (!avail.length) { u.seen = []; avail = arr.map((_, i) => i).filter(i => i !== u.last || arr.length === 1); }
+    const idx = avail[Math.floor(this.rnd() * avail.length) % avail.length];
+    u.seen.push(idx); u.last = idx; this.tplLog.push(key + "#" + idx); return arr[idx];
+  };
+  P.rint = function (n) { return Math.floor(this.rnd() * n) % n; };
+  P.myName = function () { return this.name || this.profile().name || ""; };
+  P.fmt = function (t, v) {
+    v = Object.assign({}, v || {}); const n = this.myName();
+    if (v.name_ == null) v.name_ = n && this.rnd() < 0.5 ? n + ", " : "";
+    return String(t).replace(/\{(\w+)\}/g, (_, k) => (v[k] != null ? v[k] : ""));
+  };
   P.out = function (messages, chips) {
+    this.turns.push(messages.map(m => m.text).join("\n"));
     const i = STAGES.indexOf(this.s.stage === "crisis" ? "done" : this.s.stage);
     return { messages, chips: chips || [], stage: this.s.stage, progress: Math.round((Math.max(i, 0) / (STAGES.length - 1)) * 100) };
   };
@@ -120,44 +136,80 @@
     if (!k) for (const key of Object.keys(F.topics)) if (t.includes(norm(F.topics[key].label.split(" ")[0]))) k = key;
     if (!k || !F.topics[k]) return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips());
     this.s.topic = k; this.s.qi = 0; this.s.elab = 0; this.s.answers = {}; this.s.stage = "questions";
+    this.s.usedCases = []; this.s.detourDone = false; this.s.inDetour = false; this.s.say = [];
+    const n = F.topics[k].questions.length, rest = [];
+    for (let i = 1; i < n; i++) rest.push(i);
+    for (let i = rest.length - 1; i > 0; i--) { const j = this.rint(i + 1); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    this.s.order = [0].concat(rest);
     if (this.mem) this.mem.save({ lastTopic: k });
-    return this.out([{ text: this.C.flows.topics[k].questions[0].t[0] }]);
+    const m = [], q = this.pick(F.topics[k].questions[0].t);
+    if (this.rnd() < 0.4) { const c = this.bestCase(); if (c) { this.s.usedCases.push(c.id); m.push({ text: this.pick(F.moves.opening_example) + "\n" + c.analogy, kind: "analogy", caseId: c.id }); this.moves.push("example"); this.lastMove = "example"; } }
+    m.push({ text: q }); return this.out(m);
   };
+  P.elab = function () { const F = this.C.flows; this.s.elab++; if (!this.s.firstElab) { this.s.firstElab = true; this.used[F.elaborate[0]] = { seen: [0], last: 0 }; return this.out([{ text: F.elaborate[0] }]); } return this.out([{ text: this.pick(F.elaborate) }]); };
+  P.rememberPhrase = function (raw) { const w = String(raw).replace(/["<>]/g, "").split(/\s+/).filter(Boolean); if (w.length >= 3) (this.s.say = this.s.say || []).push(w.slice(0, Math.min(5, w.length)).join(" ")); };
+  P.compose = function (q) {
+    const F = this.C.flows, M = F.moves, say = this.s.say || [];
+    const W = { short: 3, reflect: 2, example: 1.5, insight: 1.5, mirror: say.length ? 2 : 0, warm: 1.5, summary: say.length >= 2 ? 1 : 0,
+      curveball: !this.s.detourDone && this.s.qi >= 2 ? 1.2 : 0 };
+    if (W.example && !this.caseFor()) W.example = 0;
+    for (const k of this.moves.slice(-3)) W[k] = 0;
+    if (!Object.values(W).some(x => x > 0)) W.short = 1;
+    let tot = 0; for (const k in W) tot += W[k]; let r = this.rnd() * tot, mv = "short";
+    for (const k in W) { r -= W[k]; if (r < 0 && W[k] > 0) { mv = k; break; } }
+    this.moves.push(mv); this.lastMove = mv;
+    const n = this.myName(), nq = (n && this.rnd() < 0.3 ? n + ", " : "") + q, m = [];
+    const occ = this.profile().occupation, hook = (F.occupation_hooks || {})[occ];
+    switch (mv) {
+      case "short": m.push({ text: nq }); break;
+      case "reflect": m.push({ text: this.fmt(this.pick(M.reflect)) + (hook && this.rnd() < 0.5 ? "\n" + hook : ""), kind: "insight" }, { text: q }); break;
+      case "example": { const c = this.caseFor(); this.s.usedCases.push(c.id); m.push({ text: this.pick(F.analogy_intro) + "\n" + c.analogy, kind: "analogy", caseId: c.id }, { text: q }); break; }
+      case "insight": m.push({ text: this.pick(M.insight), kind: "insight" }, { text: this.pick(M.then) + " " + q }); break;
+      case "mirror": { const t = this.fmt(this.pick(M.mirror), { phrase: say[say.length - 1] }); if (this.rnd() < 0.5) m.push({ text: t + " " + nq }); else m.push({ text: t }, { text: q }); break; }
+      case "warm": if (this.rnd() < 0.5) m.push({ text: this.pick(M.warm) + " " + nq }); else m.push({ text: this.pick(M.warm) }, { text: q }); break;
+      case "summary": m.push({ text: this.fmt(this.pick(M.summary), { p1: say[say.length - 1], p2: say[0] }) }, { text: q }); break;
+      case "curveball": this.s.detourDone = true; this.s.inDetour = true; this.s.pendingQ = q; m.push({ text: this.pick(F.curveballs[this.s.topic]) }); break;
+    }
+    return m;
+  };
+  P.bestCase = function () { const all = this.C.cases.filter(c => c.topics.includes(this.s.topic) && !(this.s.usedCases || []).includes(c.id)); return all.length ? all[this.rint(all.length)] : null; };
+  P.caseFor = function () { const a = this.analogy(); return a || this.bestCase(); };
   P.st_questions = function (raw) {
     const F = this.C.flows, Q = F.topics[this.s.topic].questions;
-    if (words(raw) < 4 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: F.elaborate[(this.s.elab - 1) % F.elaborate.length] }]); }
-    const q = Q[this.s.qi]; this.s.answers[q.id] = ((this.s.answers[q.id] || "") + " " + raw).trim(); // session-only, never persisted
+    if (this.s.inDetour) { this.s.inDetour = false; this.rememberPhrase(raw);
+      return this.out([{ text: this.pick(F.moves.curveball_return) }, { text: this.s.pendingQ }]); }
+    if (words(raw) < 4 && this.s.elab < 2) return this.elab();
+    const q = Q[this.s.order[this.s.qi]]; this.s.answers[q.id] = ((this.s.answers[q.id] || "") + " " + raw).trim(); // session-only, never persisted
+    this.rememberPhrase(raw);
     this.s.qi++; this.s.elab = 0;
-    if (this.s.qi < Q.length) {
-      const m = []; if (this.rnd() < 0.5) m.push({ text: this.pick(F.ack) });
-      m.push({ text: this.pick(Q[this.s.qi].t) }); return this.out(m);
-    }
+    if (this.s.qi < Q.length) return this.out(this.compose(this.pick(Q[this.s.order[this.s.qi]].t)));
     this.s.stage = "reflection";
     const a = this.analogy(), m = [{ text: this.pick(F.topics[this.s.topic].insight), kind: "insight" }];
+    if (a) this.s.usedCases.push(a.id);
     if (a) m.push({ text: this.pick(F.analogy_intro) + " " + a.analogy, kind: "analogy", caseId: a.id });
     m.push({ text: this.pick(F.insight_followup) });
     return Object.assign(this.out(m, [{ label: "כן, מתאים", value: "כן זה מתאים לי, זה באמת מה שקורה" }, { label: "לא בדיוק", value: "לא בדיוק, אצלי זה קצת אחרת" }]), { analogyCase: a && a.id });
   };
   P.analogy = function () {
     const text = norm(Object.values(this.s.answers).join(" ")); let best = null, bs = -1;
-    for (const c of this.C.cases) { let s = c.topics.includes(this.s.topic) ? 2 : 0; for (const k of c.keywords) if (text.includes(norm(k))) s++; if (s > bs) { bs = s; best = c; } }
+    for (const c of this.C.cases) { if ((this.s.usedCases || []).includes(c.id)) continue; let s = c.topics.includes(this.s.topic) ? 2 : 0; for (const k of c.keywords) if (text.includes(norm(k))) s++; if (s > bs) { bs = s; best = c; } }
     return bs > 0 ? best : null;
   };
   P.st_reflection = function (raw) {
     const F = this.C.flows;
-    if (words(raw) < 4 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    if (words(raw) < 4 && this.s.elab < 2) return this.elab();
     this.s.elab = 0; this.s.stage = "luck"; return this.out([{ text: this.pick(F.luck), kind: "insight" }]);
   };
   P.st_luck = function (raw) {
     const F = this.C.flows;
-    if (words(raw) < 3 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    if (words(raw) < 3 && this.s.elab < 2) return this.elab();
     this.s.elab = 0; this.action = raw; this.s.stage = "closing";
     const style = this.hidden.style || (this.profile().preferredStyle) || "validation";
     return this.out([{ text: this.pick(style === "direction" ? F.ask_conclusion_direction : F.ask_conclusion_validation) }]);
   };
   P.st_closing = function (raw) {
     const F = this.C.flows;
-    if (words(raw) < 3 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    if (words(raw) < 3 && this.s.elab < 2) return this.elab();
     this.s.stage = "done";
     if (this.mem && this.hidden.style) this.mem.save({ preferredStyle: this.hidden.style });
     const m = [{ text: this.fmt(this.pick(F.closing), { conclusion: raw, action: this.action }), kind: "summary" }];
