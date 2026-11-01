@@ -1,0 +1,359 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5"><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjIwIiBmaWxsPSIjMjU2M2ViIi8+PHRleHQgeD0iNTAiIHk9IjY1IiBmb250LXNpemU9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iQXJpYWwiPkJCPC90ZXh0Pjwvc3ZnPgo=">
+<title>ביג ברדר</title>
+<style>
+:root{--bg:#f4f5fb;--panel:#fff;--text:#111827;--muted:#6b7280;--me:#4f46e5;--meText:#fff;--bot:#fff;--line:#e5e7eb;--chip:#eef2ff;--chipText:#3730a3;--accent:#4f46e5;--accent2:#7c3aed}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1020;--panel:#121833;--text:#e5e7eb;--muted:#9ca3af;--bot:#1b2347;--line:#24305e;--chip:#1e2a5a;--chipText:#c7d2fe}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:"Rubik","Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100dvh}
+header{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 12px rgba(79,70,229,.35);z-index:2}
+.logo{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-weight:800;font-size:16px;letter-spacing:.5px}
+.title{flex:1;line-height:1.15}.title b{font-size:18px;display:block}.title small{opacity:.85;font-size:12px}
+.online{display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;margin-left:4px}
+#menuBtn{background:rgba(255,255,255,.18);border:0;color:#fff;width:38px;height:38px;border-radius:12px;font-size:20px}
+#menu{position:absolute;top:calc(64px + env(safe-area-inset-top));left:10px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px;display:none;z-index:5;min-width:200px}
+#menu.open{display:block}#menu button,#menu label{display:flex;width:100%;gap:8px;align-items:center;background:none;border:0;color:inherit;padding:10px;font-size:15px;text-align:right;border-radius:10px}
+#menu button:hover{background:var(--chip)}#menu select{margin-right:auto;background:var(--chip);color:var(--text);border:0;border-radius:8px;padding:4px}
+.progress{background:var(--panel);border-bottom:1px solid var(--line);padding:8px 14px 10px}
+.steps{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px}.steps span.on{color:var(--accent);font-weight:700}
+.bar{height:5px;background:var(--line);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .5s ease}
+#log{flex:1;overflow-y:auto;padding:14px 12px 6px;display:flex;flex-direction:column;gap:6px;scroll-behavior:smooth}
+.m{max-width:82%;padding:10px 13px;border-radius:18px;white-space:pre-wrap;line-height:1.5;font-size:15.5px;animation:pop .22s ease;box-shadow:0 1px 2px rgba(0,0,0,.06);word-wrap:break-word}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bot{background:var(--bot);align-self:flex-start;border-bottom-right-radius:6px;border:1px solid var(--line)}
+.me{background:var(--me);color:var(--meText);align-self:flex-end;border-bottom-left-radius:6px}
+.note{align-self:center;max-width:92%;background:transparent;border:1px dashed var(--line);color:var(--muted);font-size:13px;text-align:center;box-shadow:none}
+.insight{border-right:4px solid var(--accent2)}.analogy{font-style:italic;border-right:4px solid #f59e0b}
+.summary{background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.12));border:1px solid rgba(124,58,237,.35)}
+.empathy{border-right:4px solid #f97316}.handoff{border-right:4px solid #10b981}
+.crisis{align-self:stretch;max-width:100%;background:#fff1f2;color:#7f1d1d;border:2px solid #f43f5e;border-radius:16px}
+@media (prefers-color-scheme:dark){.crisis{background:#3b0a14;color:#fecdd3}}
+.crisis .hl{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:12px 14px;background:#e11d48;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px}
+.crisis .hl.web{background:#9f1239}
+.typing{align-self:flex-start;background:var(--bot);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:flex;gap:4px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+#chips{display:flex;gap:8px;overflow-x:auto;padding:6px 12px;scrollbar-width:none}#chips:empty{display:none}
+.chip{flex:none;background:var(--chip);color:var(--chipText);border:1px solid transparent;border-radius:999px;padding:9px 14px;font-size:14.5px;font-weight:600}
+.chip:active{transform:scale(.97)}
+form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
+#t{flex:1;padding:12px 16px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px;outline:none}
+#t:focus{border-color:var(--accent)}
+#send{width:46px;height:46px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:19px;display:grid;place-items:center}
+.safety{font-size:11.5px;color:var(--muted);text-align:center;padding:0 12px 4px}
+</style></head><body>
+<header><div class="logo">BB</div><div class="title"><b>ביג ברדר</b><small><span class="online"></span>אח גדול, בגובה העיניים</small></div>
+<button id="menuBtn" aria-label="תפריט">⋮</button></header>
+<div id="menu" role="menu"><button id="newBtn">💬 נושא חדש</button><button id="humanBtn">🧑 לדבר עם בן אדם</button>
+<label>🌍 מדינה <select id="cc"><option value="IL">ישראל</option><option value="US">USA</option><option value="GB">UK</option><option value="INTL">אחר</option></select></label>
+<button id="forgetBtn">🗑️ שכח אותי</button></div>
+<div class="progress"><div class="steps" id="steps"><span>היכרות</span><span>נושא</span><span>שאלות</span><span>תובנה</span><span>צעד</span><span>סיכום</span></div><div class="bar"><i id="bar"></i></div></div>
+<div id="log" aria-live="polite"></div>
+<div id="chips"></div>
+<div class="safety">במצוקה? ער"ן 1201 · מד"א 101 · משטרה 100</div>
+<form id="f"><input id="t" autocomplete="off" placeholder="כתוב הודעה..." aria-label="הודעה"><button id="send" aria-label="שלח">➤</button></form>
+<script>window.BB_CONTENT={"cases":[{"id":1,"topics":["business","career"],"keywords":["פוטרתי","פיטורים","רעיון","ייעוץ","עסק","לקוחות","שוק","אפליקציה"],"analogy":"היה מישהו שפוטר ורצה לפתוח שירות ייעוץ. במקום מחקר שוק, הוא בנה לעצמו כלי קטן, ניסה אותו על עצמו, והתחיל לקבל פידבק אמיתי."},{"id":2,"topics":["career"],"keywords":["לעזוב","עבודה","מנהל","ניהול","צוות","עובדים","תפקיד","קידום","להתפתח"],"analogy":"היה מישהו שעזב עבודה של 15 שנה – הכיוון היה נכון, אבל בתפקיד החדש הוא הגיע עם דרישות מהר מדי. מה שעבד: קודם להקשיב לאנשים ולתת להם בעלות, ורק אחר כך לדרוש."},{"id":3,"topics":["relationship"],"keywords":["זוגיות","להיפרד","גירושין","להתגרש","בן זוג","בת זוג","ריבים","אשתי","בעלי","חברה שלי","חבר שלי"],"analogy":"היה זוג שנפרד וחזר שוב ושוב במשך שנים. מה שהזיז משהו היה ההבנה שזוגיות נשחקת וצריך לתחזק אותה – ושכל אחד חווה משבר אחרת. היום הם שוב גרים יחד."},{"id":4,"topics":["family"],"keywords":["ילד","ילדה","הבת","הבן","הורים","אמא","אבא","גן","בית","טיפול","התנהגות","אח","אחות"],"analogy":"היה בית שבו אחת הילדות התחילה להתנהג אחרת. לפני שרצו לטיפול, בדקו מה השתנה – והתברר שהיא פשוט צריכה יותר תשומת לב מהורה אחד, בדרך שמתאימה דווקא לה. אחרי חודשיים זה השתנה מאוד."},{"id":5,"topics":["career","other"],"keywords":["צבא","גיוס","קבע","לימודים","תואר","לפרוש","קורס","מכינה","שירות"],"analogy":"היה בחור צעיר שרצה לפרוש מתוכנית בצבא כי חשב שזה מעכב אותו. במקום זה הוא ניצל את השירות ללמוד מקצוע – ואחרי כמה שנים היה צעד לפני כולם."},{"id":6,"topics":["business"],"keywords":["שותף","שותפות","חוזה","רווחים","כסף","מוצר","חנות","מכירות"],"analogy":"היה מישהו שפתח עסק עם שותף בלי חוזה, והרווחים התחלקו לא הוגן. הם הגיעו להסדר והשותף יצא – אבל הוא דאג לשמור על הקשר האישי גם בתוך המחלוקת."}],"flows":{"disclaimer":"לפני שמתחילים: אני בוט, לא בן אדם ולא איש מקצוע, ואני יכול לטעות. התשובה הנכונה נמצאת אצלך – התפקיד שלי לעזור לך למצוא אותה.","welcome":["היי! אני ביג ברדר 👋","אהלן, כאן ביג ברדר."],"ask_name":["איך קוראים לך?","קודם כל – מה השם שלך?"],"ask_age":["נעים מאוד, {name}. באיזה טווח גיל אתה?","כיף להכיר, {name}. בן/בת כמה בערך?"],"ask_occ":["ומה אתה עושה היום?","במה אתה עסוק בימים אלה?"],"ask_city":["מאיזה אזור? (אפשר לדלג)","איפה גר בערך? לא חובה."],"welcome_back":["{name}! שמח שחזרת 🙂 עברו {days} ימים מאז הפעם הקודמת.","היי {name}, טוב לראות אותך שוב. עברו {days} ימים."],"welcome_back_today":["{name}! שמח שחזרת שוב היום 🙂"],"ask_topic":["על מה בא לך לדבר?","מה מעסיק אותך עכשיו?","במה תרצה לחשוב יחד?"],"elaborate":["כן, תפרט לי עוד","רגע, תן לי עוד קצת – מה בדיוק?","תרחיב קצת? אני רוצה להבין את התמונה מכל הכיוונים"],"ack":["הבנתי.","אוקיי, זה חשוב.","מעניין.","תודה שאתה משתף."],"topics":{"career":{"label":"עבודה / קריירה","questions":[{"id":"decision","t":["מה כבר החלטת לעשות? למשל לעזוב, להישאר, לבקש קידום?","יש לך כבר החלטה בראש? מה היא?"]},{"id":"why_now","t":["למה דווקא עכשיו? מה השתנה לאחרונה?","מה קרה שגרם לזה לעלות דווקא עכשיו?"]},{"id":"who","t":["מי עוד מושפע מזה – מנהל, צוות, משפחה? ומה הם צריכים?","מי עוד בתמונה, ומה לדעתך הם מרגישים?"]},{"id":"tried","t":["מה כבר ניסית לעשות עם זה?","עשית כבר משהו בנושא? מה יצא?"]},{"id":"who_pays","t":["ובצד הכסף: מי משלם לך היום, ומה היכולת שלך להחזיק מעמד אם תעשה שינוי?","כסף זה חלק מהתמונה – מי מממן אותך עכשיו, וכמה זמן אתה יכול להחזיק בלי הכנסה?"]},{"id":"future","t":["איך ייראה מצב טוב בעוד שנה–שנתיים?","תדמיין שעברו שנתיים והכל הסתדר – איך זה נראה?"]}],"insight":["אולי השאלה היא לא רק אם לעזוב – אלא איך עושים את זה נכון, בלי לשרוף גשרים?","יכול להיות שמה שמפריע הוא לא העבודה עצמה, אלא משהו ספציפי שהשתנה?"]},"business":{"label":"רעיון לעסק","questions":[{"id":"decision","t":["מה הרעיון, ומה כבר החלטת לגביו?","ספר לי על הרעיון – כמה רחוק כבר הגעת?"]},{"id":"why_now","t":["למה עכשיו? מה קרה שדחף אותך לזה?","מה גרם לך להתחיל לחשוב על זה דווקא עכשיו?"]},{"id":"who_pays","t":["מי ישלם בפועל על זה, ומה היכולת שלו לשלם עכשיו?","השאלה הכי חשובה: מי הלקוח שמוציא כסף, ויש לו את הכסף הזה היום?"]},{"id":"who","t":["מי עוד מעורב – שותפים, משפחה? ומה כל אחד מצפה לקבל?","יש שותפים? איך מחלקים אחריות ורווחים?"]},{"id":"tried","t":["ניסית כבר גרסה קטנה וזולה של זה – אפילו על עצמך?","מה בדקת עד עכשיו בפועל, לא בתיאוריה?"]},{"id":"future","t":["איך ייראה הצלחה בעוד שנה–שנתיים?","אם זה עובד – מה המצב בעוד שנתיים?"]}],"insight":["ומה אם לפני מחקר שוק, תבנה גרסה קטנה ותבדוק אותה על עצמך או על כמה לקוחות?","יכול להיות שהשאלה האמיתית היא מי משלם ומתי – ולא אם הרעיון טוב?"]},"relationship":{"label":"זוגיות","questions":[{"id":"decision","t":["מה אתה כבר חושב לעשות – להישאר, להיפרד, משהו אחר?","יש לך כבר החלטה בלב? מה היא?"]},{"id":"why_now","t":["מה השתנה לאחרונה? למה זה עולה עכשיו?","ממתי זה ככה, ומה קרה שזה הגיע לנקודה הזו?"]},{"id":"who","t":["מה לדעתך הצד השני מרגיש וצריך?","אם הייתי שואל את הצד השני – מה הוא/היא היו אומרים?"]},{"id":"tried","t":["מה ניסיתם כבר כדי לשפר?","עשיתם משהו יחד כדי לתחזק את הקשר? מה עבד?"]},{"id":"future","t":["איך ייראה מצב טוב בעוד שנה–שנתיים?","מה היית רוצה שיהיה ביניכם בעוד שנתיים?"]}],"insight":["אולי זה לא 'להישאר או לעזוב', אלא מה הפסקתם לתחזק?","יכול להיות שכל אחד מכם חווה את המשבר אחרת – ולכן קשה להיפגש?"]},"family":{"label":"משפחה / הורות","questions":[{"id":"decision","t":["מה כבר עלה לך לעשות? למשל טיפול, שיחה, להתרחק?","יש לך כבר כיוון? מה הוא?"]},{"id":"why_now","t":["מה השתנה לאחרונה – בבית, בגן, בעבודה?","ממתי זה התחיל, ומה קרה סביב אותו זמן?"]},{"id":"who","t":["מי מעורב, ומה כל אחד מהם צריך בנפרד?","כל אחד במשפחה שונה – מה כל אחד צריך?"]},{"id":"tried","t":["מה כבר ניסיתם?","מה עשיתם עד עכשיו, ומה קרה?"]},{"id":"future","t":["איך ייראה מצב טוב בעוד כמה חודשים?","מה תרצה לראות בבית בעוד חצי שנה?"]}],"insight":["יכול להיות שמישהו פשוט צריך יותר תשומת לב – בדרך שמתאימה דווקא לו?","אולי לפני שמחפשים פתרון חיצוני, שווה למצות שינוי קטן בבית?"]},"other":{"label":"משהו אחר","questions":[{"id":"decision","t":["על מה מדובר, ומה כבר חשבת לעשות?","ספר לי מה קורה, ומה הכיוון שלך כרגע?"]},{"id":"why_now","t":["למה דווקא עכשיו? מה השתנה?","מה גרם לזה לעלות עכשיו?"]},{"id":"who","t":["מי עוד מעורב, ומה הם צריכים?","מי עוד מושפע מזה?"]},{"id":"tried","t":["מה כבר ניסית?","עשית כבר משהו? מה יצא?"]},{"id":"future","t":["איך ייראה מצב טוב בעוד שנה–שנתיים?","איפה תרצה להיות עם זה בעוד שנתיים?"]}],"insight":["יכול להיות שמה שהשתנה הוא הסיבה האמיתית, ולא ההחלטה עצמה?","אולי יש פה שאלה אחרת מתחת לשאלה ששאלת?"]}},"insight_followup":["מה אתה חושב, זה מתאים למה שקורה אצלך?","זה מדבר אליך, או שאני רחוק?"],"analogy_intro":["אגב, זה מזכיר לי משהו:","יש לי דוגמה ממצב דומה:"],"luck":["יש משפט שאני אוהב: מזל = מ׳ מקום נכון, ז׳ זמן נכון, ל׳ לעשות מעשה. נראה לי שאתה כבר במקום ובזמן. מה הדבר הקטן והקונקרטי שתעשה השבוע?","רוב האנשים מגיעים למקום הנכון ובזמן הנכון – וחסר רק המעשה (מ-ז-ל). מה צעד אחד שאתה יכול לעשות כבר השבוע?"],"ask_conclusion_direction":["אם הייתי צריך להגיד לך מה לעשות – הייתי מתחיל מהצעד שבחרת. אבל במילים שלך: מה המסקנה שלך?","אני שומע כיוון ברור. תגיד אותו במשפט אחד – מה המסקנה שלך?"],"ask_conclusion_validation":["נשמע שאתה כבר חושב על זה לעומק. במשפט אחד – מה המסקנה שלך?","אתה בכיוון. איך היית מסכם את המסקנה שלך?"],"closing":["אז לסיכום, במילים שלך: \"{conclusion}\". הצעד הראשון: \"{action}\". זו ההחלטה שלך, ואני חושב שהיא באה ממקום טוב.","מה שאני לוקח מהשיחה – המסקנה שלך: \"{conclusion}\", והצעד: \"{action}\". תעשה אותו, ותספר לי בפעם הבאה."],"closing_execution":"וזכור: איך מבצעים חשוב כמו מה מחליטים – למשל, אם עוזבים, עוזבים יפה.","human_offer":"אם תרצה, אפשר לקבוע 5 דקות עם אח גדול אמיתי.","reverse_empathy":["אני מבין שאתה כועס, וזה לגיטימי. רגע לפני שאתה פועל מתוך זה – איך לדעתך זה ייראה מהצד השני? מה הם יחשבו ויזכרו?","בוא נעצור שנייה. אם תעשה את זה עכשיו מתוך כעס – מה יקרה מחר? ואיך הצד השני יראה אותך אחרי זה?"],"reverse_empathy_bot":["זה בסדר לכעוס, גם עליי 🙂 אני כאן. מה הכי מתסכל אותך עכשיו?"],"nonconverge":"נראה לי שאנחנו מסתובבים במעגל, וזה בסדר.","done":["רוצה לפתוח נושא חדש?"],"locked":"אני עדיין כאן. הכי חשוב עכשיו – לדבר עם אחד מהקווים למעלה או עם מישהו קרוב."}};</script><script>(function (root) {
+  const KW = {
+    3: ["הולך להתאבד","הולכת להתאבד","קניתי כדורים","הלילה זה נגמר","כתבתי מכתב פרידה","going to kill myself","tonight i end it"],
+    2: ["להתאבד","מתאבד","בא לי למות","רוצה למות","לפגוע בעצמי","חותך את עצמי","חותכת את עצמי","עדיף שלא אהיה","kill myself","suicide","suicidal","want to die","self harm","self-harm","cut myself"],
+    1: ["אין טעם לחיות","אף אחד לא יתגעגע","יותר טוב בלעדיי","נמאס לי מהחיים","no reason to live","better off without me"]
+  };
+  const HARM_OTHERS = ["אהרוג אותו","אהרוג אותה","אני אהרוג","לפגוע בו","לפגוע בה","לרצוח","kill him","kill her","hurt him","hurt her","shoot them"];
+  const HANDOFF = {response_time_hours:24, max_handoffs_per_user:2, window_days:30, non_convergence_repeats:2};
+  const HOTLINES = {
+    IL: [{name:'ער"ן – עזרה ראשונה נפשית (24/7)',phone:"1201"},{name:'ער"ן בוואטסאפ',url:"https://wa.me/972528451201"},{name:'סה"ר – צ\'אט 24/7',url:"https://sahar.org.il"},{name:'מד"א – סכנה מיידית',phone:"101"},{name:"משטרה",phone:"100"}],
+    US: [{name:"988 Suicide & Crisis Lifeline",phone:"988"},{name:"Emergency",phone:"911"}],
+    GB: [{name:"Samaritans",phone:"116123"},{name:"Emergency",phone:"999"}],
+    INTL: [{name:"Find A Helpline",url:"https://findahelpline.com"}]
+  };
+  function norm(t){return String(t||"").toLowerCase().replace(/[\u0591-\u05C7]/g,"").replace(/\s+/g," ");}
+  function detectCrisis(text){
+    const t = norm(text);
+    for (const k of HARM_OTHERS) if (t.includes(k)) return {level:3, trigger:k, type:"others"};
+    for (const lvl of [3,2,1]) for (const k of KW[lvl]) if (t.includes(k)) return {level:lvl, trigger:k};
+    return {level:0, trigger:null};
+  }
+  function getHotlines(cc){ return HOTLINES[(cc||"IL").toUpperCase()] || HOTLINES.INTL; }
+  const QUESTIONS = ["מה קורה? ספר במשפט אחד.","מה כבר החלטת לעשות?","למה דווקא עכשיו? מה השתנה?","מי עוד מעורב, ומה הוא או היא צריכים?","מה כבר ניסית?","איך ייראה מצב טוב בעוד שנה-שנתיים?","מי משלם בפועל, ומה היכולת שלו לשלם עכשיו?"];
+  const ELABORATE="כן, תפרט לי עוד";
+  const DISCLAIMER="תזכורת: אתה מדבר עם בוט, הוא יכול לטעות. התשובה הנכונה נמצאת אצלך – אני כאן לעזור לך למצוא אותה.";
+  function crisisMessage(level,type){
+    if (type==="others") return "אני חייב לעצור כאן. כשיש סכנה שמישהו ייפגע – פונים מיד לעזרה: משטרה 100 או מד\"א 101. אם אתה מרגיש שאתה מאבד שליטה, ער\"ן 1201 זמינים עכשיו לדבר.";
+    return (level>=3?"אני מודאג לשלומך עכשיו. אם אתה בסכנה מיידית – תתקשר עכשיו למד\"א 101 או למשטרה 100.\n":"") +
+      "אני שומע שקשה לך מאוד, ואני רוצה שתהיה בטוח. אני בוט ולא יכול לעזור בזה כמו בן אדם – אבל יש אנשים שזמינים בשבילך עכשיו. יש מישהו קרוב שאתה יכול להתקשר אליו עכשיו?";
+  }
+  // Demo (rule-based) flow: asks opening questions, then a methodology-shaped summary.
+  function demoReply(state, userText){
+    state.answers = state.answers || [];
+    const words = String(userText).trim().split(/\s+/).filter(Boolean).length;
+    if (words < 4 && !state.elaborated) { state.elaborated = true; return ELABORATE; }
+    state.elaborated = false;
+    state.answers.push(userText);
+    const i = state.answers.length;
+    if (i < QUESTIONS.length) return QUESTIONS[i];
+    return "תודה. אולי – רק אולי? – לפני שאני מאשר את מה שהחלטת – שים לב: מה שהשתנה (\"" + state.answers[2] + "\") אולי הוא הבעיה האמיתית, לא ההחלטה עצמה.\n" +
+      "צעד קונקרטי לשבוע הקרוב: שיחה אחת עם " + (state.answers[3]||"האדם המעורב") + " – לשאול מה הוא צריך, לפני שאתה דורש משהו.\n" +
+      "רוצה 5 דקות עם אח גדול אמיתי החודש? (מצב הדגמה – תשובה מבוססת כללים, לא AI)";
+  }
+  // Non-crisis handoff with per-user cap (Sharon clarification 8)
+  function requestHandoff(user, now, cfg){
+    cfg = cfg || HANDOFF; now = now || Date.now();
+    const win = cfg.window_days*864e5;
+    user.handoffs = (user.handoffs||[]).filter(ts => now-ts < win);
+    if (user.handoffs.length >= cfg.max_handoffs_per_user)
+      return {ok:false, message:"הגעת למכסת ההעברות לגורם אנושי לתקופה הזו. נמשיך כאן ביחד, ואפשר לנסות שוב בהמשך."};
+    user.handoffs.push(now);
+    return {ok:true, message:"השיחה הועברה לגורם אנושי לבחינה. תשובה תתקבל תוך "+cfg.response_time_hours+" שעות."};
+  }
+  function isNonConverging(history, cfg){
+    cfg = cfg || HANDOFF; const seen={};
+    for (const h of history){ const k=norm(h).trim(); seen[k]=(seen[k]||0)+1; if (seen[k]>cfg.non_convergence_repeats) return true; }
+    return false;
+  }
+  const api = {requestHandoff,isNonConverging,HANDOFF,ELABORATE,DISCLAIMER,HARM_OTHERS,detectCrisis,getHotlines,QUESTIONS,crisisMessage,demoReply,KW};
+  if (typeof module !== "undefined") module.exports = api; else root.BB = api;
+})(this);
+</script><script>// Per-user memory: ONLY general details. Never dilemma content / free text answers.
+(function (root) {
+  const KEY = "bb_profile_v1";
+  const ENUMS = {
+    ageRange: ["מתחת ל-18","18–21","22–26","27–35","35+"],
+    occupation: ["תלמיד/ה","חייל/ת","סטודנט/ית","עובד/ת","מחפש/ת עבודה","אחר"],
+    preferredStyle: ["direction","validation"],
+    lastTopic: ["career","business","relationship","family","other"]
+  };
+  const ALLOWED = ["name","ageRange","occupation","city","preferredStyle","sessions","lastVisit","lastTopic","handoffs"];
+  function clean(k, v) {
+    if (ENUMS[k]) return ENUMS[k].includes(v) ? v : undefined;
+    if (k === "name" || k === "city") { v = String(v || "").replace(/[<>]/g, "").trim().slice(0, 24); return v || undefined; }
+    if (k === "sessions") return Number.isInteger(v) && v >= 0 ? v : undefined;
+    if (k === "handoffs") return Array.isArray(v) ? v.filter(x => typeof x === "number").slice(-20) : undefined;
+    if (k === "lastVisit") return typeof v === "number" ? v : undefined;
+  }
+  function createMemory(storage) {
+    let mem = {};
+    const st = {
+      get() { try { if (storage) return storage.getItem(KEY); } catch (e) {} return mem[KEY] || null; },
+      set(v) { mem[KEY] = v; try { if (storage) storage.setItem(KEY, v); } catch (e) {} },
+      del() { delete mem[KEY]; try { if (storage) storage.removeItem(KEY); } catch (e) {} }
+    };
+    return {
+      load() { try { const o = JSON.parse(st.get() || "null"); if (!o) return null; const r = {}; for (const k of ALLOWED) { const c = clean(k, o[k]); if (c !== undefined) r[k] = c; } return r; } catch (e) { return null; } },
+      save(patch) { const cur = this.load() || {}; for (const k of Object.keys(patch || {})) { if (!ALLOWED.includes(k)) continue; const c = clean(k, patch[k]); if (c !== undefined) cur[k] = c; } st.set(JSON.stringify(cur)); return cur; },
+      forget() { st.del(); },
+      raw() { return st.get(); }
+    };
+  }
+  const api = { createMemory, ALLOWED, ENUMS, KEY };
+  if (typeof module !== "undefined") module.exports = api; else root.BBMemory = api;
+})(this);
+</script><script>// Big Brother non-AI dialogue engine. Pure: handle(text) -> {messages, chips, stage, progress, crisis?}
+(function (root) {
+  const isNode = typeof module !== "undefined";
+  const BB = isNode ? require("./safety.js") : root.BB;
+  const STAGES = ["welcome","acquaint","topic","questions","reflection","luck","closing","done"];
+  const ANGER = ["מתפטר עכשיו","אתפטר עכשיו","אעזוב בטריקת","לטרוק את הדלת","אגיד לו מה אני חושב","אצעק עליו","אצעק עליה","אשלח לו הודעה","בא לי לשבור","אני רותח","עצבים","דפוק","מטומטם","מטומטמת","אידיוט","יא חרא","קוקסינל","שונא אותו","שונאת אותו","fuck","שיזדיין","שתזדיין","לך תזדיין"];
+  const AT_BOT = ["בוט מטומטם","אתה מטומטם","אתה דפוק","אתה אידיוט","בוט דפוק","אתה חרא","לך תזדיין"];
+  const DIRECTION = ["מה אתה חושב שאני צריך","מה לעשות","תגיד לי מה","מה כדאי לי","מה אתה ממליץ"];
+  const VALIDATION = ["אתה חושב שזה נכון","זה הגיוני","טעיתי","צדקתי"];
+  const MOTIV = ["רוצה","חייב","מנסה","שוב ושוב","לא מוותר","אעשה הכל","מת על"];
+  const ABILITY = ["הצלחתי","יודע לעשות","ניסיון","קידמו אותי","הובלתי","בניתי","סיימתי"];
+  const DONTKNOW = ["לא יודע","לא יודעת","אין לי מושג","לא בטוח","לא בטוחה","אולי"];
+  const norm = s => String(s || "").toLowerCase().replace(/[\u0591-\u05C7]/g, "").replace(/[!?.,"']/g, " ").replace(/\s+/g, " ").trim();
+  const has = (t, list) => list.some(k => t.includes(norm(k)));
+  const words = s => String(s || "").trim().split(/\s+/).filter(Boolean).length;
+
+  function Engine(opts) {
+    opts = opts || {};
+    this.C = opts.content; this.mem = opts.memory; this.now = opts.now || (() => Date.now());
+    this.rnd = opts.random || Math.random; this.handoffCfg = opts.handoff || BB.HANDOFF;
+    this.country = opts.country || "IL";
+    this.s = { stage: "welcome", sub: null, topic: null, qi: 0, elab: 0, answers: {}, hist: [], dk: 0, locked: false, pendingAnger: false };
+    this.hidden = { motivation: 0, ability: 0, style: null, personType: null }; // internal only
+  }
+  const P = Engine.prototype;
+  P.pick = function (arr) { return Array.isArray(arr) ? arr[Math.floor(this.rnd() * arr.length) % arr.length] : arr; };
+  P.fmt = function (t, v) { return String(t).replace(/\{(\w+)\}/g, (_, k) => (v && v[k] != null ? v[k] : "")); };
+  P.out = function (messages, chips) {
+    const i = STAGES.indexOf(this.s.stage === "crisis" ? "done" : this.s.stage);
+    return { messages, chips: chips || [], stage: this.s.stage, progress: Math.round((Math.max(i, 0) / (STAGES.length - 1)) * 100) };
+  };
+  P.profile = function () { return (this.mem && this.mem.load()) || {}; };
+  P.topicChips = function () { const T = this.C.flows.topics; return Object.keys(T).map(k => ({ label: T[k].label, value: "topic:" + k })); };
+
+  P.start = function () {
+    const F = this.C.flows, p = this.profile(), m = [];
+    if (p.name) {
+      const days = p.lastVisit ? Math.floor((this.now() - p.lastVisit) / 864e5) : 0;
+      m.push({ text: this.fmt(this.pick(days > 0 ? F.welcome_back : F.welcome_back_today), { name: p.name, days }) });
+      m.push({ text: F.disclaimer, kind: "note" });
+      this.mem.save({ sessions: (p.sessions || 0) + 1, lastVisit: this.now() });
+      this.s.stage = "topic";
+      m.push({ text: this.pick(F.ask_topic) });
+      return this.out(m, this.topicChips());
+    }
+    m.push({ text: this.pick(F.welcome) }, { text: F.disclaimer, kind: "note" }, { text: this.pick(F.ask_name) });
+    this.s.stage = "acquaint"; this.s.sub = "name";
+    return this.out(m);
+  };
+
+  P.observe = function (t) {
+    if (has(t, MOTIV)) this.hidden.motivation++;
+    if (has(t, ABILITY)) this.hidden.ability++;
+    if (has(t, DIRECTION)) this.hidden.style = "direction";
+    else if (has(t, VALIDATION)) this.hidden.style = "validation";
+    const h = this.hidden;
+    h.personType = h.ability && h.motivation ? "ability+motivation" : h.ability ? "ability-only" : h.motivation ? "motivation-only" : null;
+  };
+
+  P.handle = function (input) {
+    const raw = String(input || "").trim(); const F = this.C.flows;
+    // 1) SAFETY FIRST – every message, every stage
+    const c = BB.detectCrisis(raw);
+    if (c.level > 0) {
+      this.s.locked = true; this.s.stage = "crisis";
+      return Object.assign(this.out([{ text: BB.crisisMessage(c.level, c.type), kind: "crisis" }]),
+        { crisis: { level: c.level, type: c.type || "self", hotlines: BB.getHotlines(this.country) } });
+    }
+    if (this.s.locked) return Object.assign(this.out([{ text: F.locked }]), { crisis: { level: 0, reminder: true, hotlines: BB.getHotlines(this.country) } });
+    const t = norm(raw);
+    if (raw === "action:forget") { if (this.mem) this.mem.forget(); this.s = { stage: "welcome", answers: {}, hist: [], dk: 0, qi: 0, elab: 0 }; return Object.assign(this.start(), { forgotten: true }); }
+    if (raw === "action:human") return this.handoff();
+    if (raw === "action:new") { this.s.stage = "topic"; return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips()); }
+    this.observe(t);
+    // 2) reverse empathy (not during acquaintance)
+    if (this.s.stage !== "acquaint" && this.s.stage !== "welcome") {
+      if (has(t, AT_BOT)) return this.out([{ text: this.pick(F.reverse_empathy_bot), kind: "empathy" }], this.chipsFor());
+      if (has(t, ANGER) && !this.s.pendingAnger) {
+        this.s.pendingAnger = true;
+        return this.out([{ text: this.pick(F.reverse_empathy), kind: "empathy" }], this.chipsFor());
+      }
+      this.s.pendingAnger = false;
+    }
+    // 3) non-convergence (questions stages only)
+    if (["questions","reflection","luck","closing"].includes(this.s.stage)) {
+      this.s.hist.push(t);
+      if (has(t, DONTKNOW) && words(raw) <= 3) this.s.dk++;
+      const rep = this.s.hist.filter(x => x === t).length;
+      if (this.s.dk >= 3 || (rep >= 3 && words(raw) > 0)) { this.s.dk = 0; this.s.hist = []; return this.handoff(true); }
+    }
+    return this["st_" + this.s.stage](raw, t);
+  };
+
+  P.chipsFor = function () { return []; };
+  P.handoff = function (auto) {
+    const F = this.C.flows; const user = { handoffs: this.profile().handoffs || this.handoffLog || [] };
+    const r = BB.requestHandoff(user, this.now(), this.handoffCfg); this.handoffLog = user.handoffs;
+    if (this.mem) this.mem.save({ handoffs: user.handoffs });
+    const m = []; if (auto) m.push({ text: F.nonconverge });
+    m.push({ text: r.message, kind: r.ok ? "handoff" : "note" });
+    return Object.assign(this.out(m, r.ok ? [] : [{ label: "נמשיך כאן", value: "action:new" }]), { handoff: r });
+  };
+
+  P.st_welcome = function () { return this.start(); };
+  P.st_acquaint = function (raw) {
+    const F = this.C.flows, E = (isNode ? require("./memory.js") : root.BBMemory).ENUMS;
+    const save = o => this.mem && this.mem.save(o);
+    if (this.s.sub === "name") {
+      const name = raw.replace(/^(קוראים לי|אני|שמי)\s+/, "").split(/\s+/)[0];
+      if (!name) return this.out([{ text: this.pick(F.ask_name) }]);
+      this.name = name; save({ name, sessions: 1, lastVisit: this.now() });
+      this.s.sub = "age"; return this.out([{ text: this.fmt(this.pick(F.ask_age), { name }) }], E.ageRange.map(v => ({ label: v, value: v })));
+    }
+    if (this.s.sub === "age") { save({ ageRange: raw }); this.s.sub = "occ"; return this.out([{ text: this.pick(F.ask_occ) }], E.occupation.map(v => ({ label: v, value: v }))); }
+    if (this.s.sub === "occ") { save({ occupation: raw }); this.s.sub = "city"; return this.out([{ text: this.pick(F.ask_city) }], [{ label: "דלג", value: "skip" }]); }
+    if (this.s.sub === "city") { if (raw !== "skip") save({ city: raw }); this.s.stage = "topic"; return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips()); }
+  };
+  P.st_topic = function (raw, t) {
+    const F = this.C.flows; let k = raw.startsWith("topic:") ? raw.slice(6) : null;
+    if (!k) for (const key of Object.keys(F.topics)) if (t.includes(norm(F.topics[key].label.split(" ")[0]))) k = key;
+    if (!k || !F.topics[k]) return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips());
+    this.s.topic = k; this.s.qi = 0; this.s.elab = 0; this.s.answers = {}; this.s.stage = "questions";
+    if (this.mem) this.mem.save({ lastTopic: k });
+    return this.out([{ text: this.C.flows.topics[k].questions[0].t[0] }]);
+  };
+  P.st_questions = function (raw) {
+    const F = this.C.flows, Q = F.topics[this.s.topic].questions;
+    if (words(raw) < 4 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: F.elaborate[(this.s.elab - 1) % F.elaborate.length] }]); }
+    const q = Q[this.s.qi]; this.s.answers[q.id] = ((this.s.answers[q.id] || "") + " " + raw).trim(); // session-only, never persisted
+    this.s.qi++; this.s.elab = 0;
+    if (this.s.qi < Q.length) {
+      const m = []; if (this.rnd() < 0.5) m.push({ text: this.pick(F.ack) });
+      m.push({ text: this.pick(Q[this.s.qi].t) }); return this.out(m);
+    }
+    this.s.stage = "reflection";
+    const a = this.analogy(), m = [{ text: this.pick(F.topics[this.s.topic].insight), kind: "insight" }];
+    if (a) m.push({ text: this.pick(F.analogy_intro) + " " + a.analogy, kind: "analogy", caseId: a.id });
+    m.push({ text: this.pick(F.insight_followup) });
+    return Object.assign(this.out(m, [{ label: "כן, מתאים", value: "כן זה מתאים לי, זה באמת מה שקורה" }, { label: "לא בדיוק", value: "לא בדיוק, אצלי זה קצת אחרת" }]), { analogyCase: a && a.id });
+  };
+  P.analogy = function () {
+    const text = norm(Object.values(this.s.answers).join(" ")); let best = null, bs = -1;
+    for (const c of this.C.cases) { let s = c.topics.includes(this.s.topic) ? 2 : 0; for (const k of c.keywords) if (text.includes(norm(k))) s++; if (s > bs) { bs = s; best = c; } }
+    return bs > 0 ? best : null;
+  };
+  P.st_reflection = function (raw) {
+    const F = this.C.flows;
+    if (words(raw) < 4 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    this.s.elab = 0; this.s.stage = "luck"; return this.out([{ text: this.pick(F.luck), kind: "insight" }]);
+  };
+  P.st_luck = function (raw) {
+    const F = this.C.flows;
+    if (words(raw) < 3 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    this.s.elab = 0; this.action = raw; this.s.stage = "closing";
+    const style = this.hidden.style || (this.profile().preferredStyle) || "validation";
+    return this.out([{ text: this.pick(style === "direction" ? F.ask_conclusion_direction : F.ask_conclusion_validation) }]);
+  };
+  P.st_closing = function (raw) {
+    const F = this.C.flows;
+    if (words(raw) < 3 && this.s.elab < 2) { this.s.elab++; return this.out([{ text: this.pick(F.elaborate) }]); }
+    this.s.stage = "done";
+    if (this.mem && this.hidden.style) this.mem.save({ preferredStyle: this.hidden.style });
+    const m = [{ text: this.fmt(this.pick(F.closing), { conclusion: raw, action: this.action }), kind: "summary" }];
+    if (this.s.topic === "career") m.push({ text: F.closing_execution });
+    m.push({ text: F.human_offer + " " + this.pick(F.done) });
+    return this.out(m, [{ label: "נושא חדש", value: "action:new" }, { label: "לדבר עם בן אדם", value: "action:human" }]);
+  };
+  P.st_done = function () { return this.out([{ text: this.pick(this.C.flows.done) }], [{ label: "נושא חדש", value: "action:new" }, { label: "לדבר עם בן אדם", value: "action:human" }]); };
+  P.st_crisis = function () { return this.out([{ text: this.C.flows.locked }]); };
+
+  const api = { Engine, STAGES };
+  if (isNode) module.exports = api; else root.BBEngine = api;
+})(this);
+</script>
+<script>
+(async function(){
+const $=id=>document.getElementById(id),log=$('log'),chipsEl=$('chips'),t=$('t');
+let C=window.BB_CONTENT;
+if(!C){const [cases,flows]=await Promise.all([fetch('content/cases.json').then(r=>r.json()),fetch('content/flows.json').then(r=>r.json())]);C={cases,flows};}
+let storage=null;try{storage=window.localStorage;storage.getItem('x')}catch(e){storage=null}
+const memory=BBMemory.createMemory(storage);
+const DELAY=window.BB_TEST?0:1;
+let eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});
+window.bbEngine=eng;
+const STEP={acquaint:0,welcome:0,topic:1,questions:2,reflection:3,luck:4,closing:5,done:5,crisis:5};
+function setProgress(r){$('bar').style.width=r.progress+'%';[...$('steps').children].forEach((s,i)=>s.classList.toggle('on',i===STEP[r.stage]));}
+function bubble(m,cls){const d=document.createElement('div');d.className='m '+cls+(m.kind?' '+m.kind:'');d.textContent=m.text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+function hotlines(d,list){list.forEach(h=>{const a=document.createElement('a');a.className='hl'+(h.url?' web':'');a.href=h.phone?'tel:'+h.phone:h.url;if(h.url)a.target='_blank';a.innerHTML='<span></span><span>'+(h.phone?'📞 '+h.phone:'🌐')+'</span>';a.firstChild.textContent=h.name;d.appendChild(a);});}
+let busy=Promise.resolve();
+function render(r){busy=busy.then(async()=>{chipsEl.innerHTML='';
+  for(const m of r.messages){if(DELAY){const ty=document.createElement('div');ty.className='typing';ty.innerHTML='<i></i><i></i><i></i>';log.appendChild(ty);log.scrollTop=log.scrollHeight;
+    await new Promise(x=>setTimeout(x,Math.min(1400,350+m.text.length*12)));ty.remove();}
+    const d=bubble(m,m.kind==='note'?'':'bot');if(m.kind==='note')d.className='m note';
+    if(r.crisis&&r.crisis.hotlines&&(m.kind==='crisis'||r.crisis.reminder)){if(r.crisis.reminder)d.classList.add('crisis');hotlines(d,r.crisis.hotlines);d.dataset.level=r.crisis.level;}}
+  (r.chips||[]).forEach(c=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=c.label;b.onclick=()=>send(c.value,c.label);chipsEl.appendChild(b);});
+  setProgress(r);});return busy;}
+function send(v,label){if(!v)return;bubble({text:label||v},'me');window.bbLast=render(eng.handle(v));return window.bbLast;}
+window.bbSend=send;
+$('f').onsubmit=e=>{e.preventDefault();const v=t.value.trim();t.value='';send(v);};
+$('menuBtn').onclick=()=>$('menu').classList.toggle('open');
+$('newBtn').onclick=()=>{$('menu').classList.remove('open');send('action:new','נושא חדש');};
+$('humanBtn').onclick=()=>{$('menu').classList.remove('open');send('action:human','לדבר עם בן אדם');};
+$('cc').onchange=()=>{eng.country=$('cc').value;};
+$('forgetBtn').onclick=()=>{$('menu').classList.remove('open');memory.forget();log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;bubble({text:'מחקתי את כל מה שזכרתי עליך.'},'m note');window.bbLast=render(eng.start());};
+window.bbReady=render(eng.start());
+if('serviceWorker' in navigator&&location.protocol.startsWith('http')&&!window.BB_CONTENT)navigator.serviceWorker.register('sw.js');
+})();
+</script></body></html>
