@@ -9,7 +9,7 @@ const CFG = {
   rate: { perMin: 8, perDay: 120, insightPerDay: 10 }
 };
 const PROFILE_KEYS = ['name', 'ageRange', 'occupation', 'tone', 'length']; // general details only
-const STAGES = ['topic', 'questions', 'reflection', 'luck', 'closing', 'done'];
+const STAGES = ['topic', 'qa', 'questions', 'reflection', 'luck', 'closing', 'done'];
 const UNDERSTAND = ['short', 'answer', 'off_topic', 'anger', 'dont_know', 'question_to_bot'];
 const PTYPES = ['ability+motivation', 'ability-only', 'motivation-only', 'unknown'];
 
@@ -44,12 +44,12 @@ function sanitize(body) {
     .map(m => ({ role: m && m.role === 'bot' ? 'bot' : 'user', text: str(m && m.text, CFG.maxMsgChars) })).filter(m => m.text);
   const p = body.profile && typeof body.profile === 'object' ? body.profile : {}, profile = {};
   for (const k of PROFILE_KEYS) if (typeof p[k] === 'string' && p[k]) profile[k] = str(p[k], 30);
-  return { mode, msgs, profile, planned: str(body.planned, 400), stage: STAGES.includes(body.stage) ? body.stage : 'questions', topic: str(body.topic, 20).replace(/[^a-z_]/g, ''), personHint: PTYPES.includes(body.person_hint) && body.person_hint !== 'unknown' ? body.person_hint : null };
+  return { mode, msgs, profile, planned: str(body.planned, 400), stage: STAGES.includes(body.stage) ? body.stage : 'questions', topic: str(body.topic, 20).replace(/[^a-z_]/g, ''), free: body.free === true, personHint: PTYPES.includes(body.person_hint) && body.person_hint !== 'unknown' ? body.person_hint : null };
 }
 function buildInput(s) {
   const conv = s.msgs.map(m => (m.role === 'bot' ? 'בוט: ' : 'משתמש: ') + m.text).join('\n');
   return 'פרופיל כללי: ' + JSON.stringify(s.profile) + '\nנושא: ' + s.topic + '\nשלב: ' + s.stage + (s.personHint ? '\nסוג אדם (פנימי, מצטבר): ' + s.personHint : '') +
-    (s.mode === 'turn' ? '\nplanned: ' + s.planned : '') + '\n--- שיחה ---\n' + conv + '\n--- החזר JSON בלבד ---';
+    (s.mode === 'turn' ? (s.free ? '\nמצב: free (אין התאמה במאגר שאלות-תשובות – נתח את ההודעה האחרונה בהקשר השיחה וענה עליה ישירות; planned הוא רק רמז)' : '') + '\nplanned: ' + s.planned : '') + '\n--- שיחה ---\n' + conv + '\n--- החזר JSON בלבד ---';
 }
 function outText(j) {
   if (typeof j.output_text === 'string') return j.output_text;

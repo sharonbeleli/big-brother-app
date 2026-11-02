@@ -17,6 +17,7 @@
     if (h.aiVoteN >= 2 && (!h.aiPersonType || (w[best] || 0) > (w[h.aiPersonType] || 0) * 1.3)) h.aiPersonType = best;
     return h.aiPersonType || null;
   }
+  function seen(eng, t) { return !!(eng.wasSent && eng.wasSent(t)); }
   function hist(eng) { return eng.aiHist || (eng.aiHist = []); }
   function remember(eng, role, text) { const h = hist(eng); h.push({ role, text: String(text).slice(0, 600) }); if (h.length > 12) h.splice(0, h.length - 12); }
   function escalate(eng, level) {
@@ -33,7 +34,9 @@
       if (/^(action|topic):/.test(v) || r.handoff || SKIP_STAGES.includes(r.stage)) { return r; }
       remember(eng, "user", v);
       const planned = r.messages.map(m => m.text).join("\n");
-      const base = { messages: hist(eng).slice(), profile: profileOf(eng), stage: r.stage, topic: eng.s.topic || "", person_hint: eng.hidden.aiPersonType || undefined };
+      // free=true: the Q&A knowledge base found no confident match -> AI analyses the message in context (history) instead of only rephrasing.
+      const free = !!r.qaMiss && !r.qa;
+      const base = { messages: hist(eng).slice(), profile: profileOf(eng), stage: r.stage, topic: eng.s.topic || "", person_hint: eng.hidden.aiPersonType || undefined, free };
       const insightStep = r.messages.some(m => m.kind === "insight") && r.stage === "reflection";
       const [t, ins] = await Promise.all([
         withTimeout(Promise.resolve(call(Object.assign({ mode: "turn", planned }, base))).catch(() => null), ms),
@@ -48,6 +51,13 @@
         eng.aiNonConv = t.converging === false ? (eng.aiNonConv || 0) + 1 : 0;
         if (eng.aiNonConv >= NONCONV_LIMIT && ["questions", "reflection", "luck", "closing"].includes(r.stage)) {
           eng.aiNonConv = 0; out = Object.assign(eng.handoff(true), { aiHandoff: true });
+        } else if (r.qa) {
+          // curated KB answer stays as-is; AI call here served only as the 2nd (escalate-only) crisis check + classification
+        } else if (t.reply && seen(eng, t.reply)) {
+          // anti-repetition: AI repeated a line already sent -> keep the rule reply
+        } else if (free && t.reply) {
+          const keep = r.messages.filter(m => m.kind === "note" || m.kind === "handoff");
+          out = Object.assign({}, r, { messages: keep.concat([{ text: t.reply, ai: true }]), aiFree: true });
         } else if (t.reply && !insightStep) {
           const msgs = r.messages.slice(), i = msgs.length - 1;
           if (i >= 0 && !msgs[i].kind && msgs[i].text !== BB().ELABORATE) { msgs[i] = Object.assign({}, msgs[i], { text: t.reply, ai: true }); out = Object.assign({}, r, { messages: msgs }); }
@@ -57,7 +67,7 @@
         const msgs = r.messages.map(m => m.kind === "insight" ? Object.assign({}, m, { text: ins.insight, ai: true }) : m);
         out = Object.assign({}, r, { messages: msgs });
       }
-      for (const m of out.messages) remember(eng, "bot", m.text);
+      for (const m of out.messages) { remember(eng, "bot", m.text); if (m.ai && eng.markSent) eng.markSent(m.text); }
       return out;
     } catch (e) { return r; }
   }

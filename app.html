@@ -54,12 +54,12 @@ form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom
 <div id="chips"></div>
 <div class="safety">במצוקה? ער"ן 1201 · מד"א 101 · משטרה 100</div>
 <form id="f"><input id="t" autocomplete="off" placeholder="כתוב הודעה..." aria-label="הודעה"><button id="send" aria-label="שלח">➤</button></form>
-<script src="safety.js"></script><script src="memory.js"></script><script src="engine.js"></script><script src="ai.js"></script>
+<script src="safety.js"></script><script src="memory.js"></script><script src="qa.js"></script><script src="engine.js"></script><script src="ai.js"></script>
 <script>
 (async function(){
 const $=id=>document.getElementById(id),log=$('log'),chipsEl=$('chips'),t=$('t');
 let C=window.BB_CONTENT;
-if(!C){const [cases,flows]=await Promise.all([fetch('content/cases.json').then(r=>r.json()),fetch('content/flows.json').then(r=>r.json())]);C={cases,flows};}
+if(!C){const [cases,flows,qa]=await Promise.all([fetch('content/cases.json').then(r=>r.json()),fetch('content/flows.json').then(r=>r.json()),fetch('content/qa.he.json').then(r=>r.json()).catch(()=>null)]);C={cases,flows,qa};}
 let storage=null;try{storage=window.localStorage;storage.getItem('x')}catch(e){storage=null}
 const memory=BBMemory.createMemory(storage);
 const DELAY=window.BB_TEST?0:1;
