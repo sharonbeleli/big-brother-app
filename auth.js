@@ -24,7 +24,7 @@ const css=`#gate{position:fixed;inset:0;z-index:50;background:var(--bg);overflow
 #gate .lnk{background:none;border:0;color:var(--accent);font-size:14px;margin-top:10px;width:100%}
 #gate .opts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}#gate .opts button{background:var(--chip);color:var(--chipText);border:2px solid transparent;border-radius:999px;padding:10px 14px;font-size:15px;font-weight:600}
 #gate .opts button.on{border-color:var(--accent)}#gate .err{color:#e11d48;font-size:14px;min-height:18px}
-#gate .priv{font-size:12px;color:var(--muted);line-height:1.5;margin-top:10px}#gate .hot{font-size:12px;color:var(--muted);margin-top:16px;text-align:center}
+#gate .priv{font-size:12px;color:var(--muted);line-height:1.5;margin-top:10px}#gate .pl{border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}#gate .pl p{margin:4px 0}#gate .mk{background:#fef3c7;color:#92400e;border-radius:10px;padding:8px;font-weight:600}#gate button[disabled]{opacity:.6}#gate .hot{font-size:12px;color:var(--muted);margin-top:16px;text-align:center}
 #trialBadge{font-size:11px;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 8px;margin-inline-start:4px}`;
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 const gate=document.createElement('div');gate.id='gate';document.body.appendChild(gate);
@@ -65,7 +65,35 @@ async function loadAccess(){try{const r=await sb.rpc('access_status');if(r.error
 // localStorage is only a cache of the server's handoff timestamps (used by the offline engine for instant UX).
 function cacheHandoffs(h){try{if(!h||!Array.isArray(h.timestamps))return;BBMemory.createMemory(window.localStorage).save({handoffs:h.timestamps});
  if(window.bbEngine){window.bbEngine.handoffLog=h.timestamps.slice();window.bbEngine.handoffCfg=Object.assign({},window.bbEngine.handoffCfg||{},{max_handoffs_per_user:h.max,window_days:h.window_days,response_time_hours:h.response_time_hours});}}catch(e){}}
-function paywall(){el(`<h1>תקופת הניסיון הסתיימה</h1><p>תודה שניסית את ביג ברדר! 💜</p><h1 style="font-size:20px">תשלום יגיע בקרוב</h1><p>אנחנו עובדים על אפשרות מנוי. בינתיים אפשר לפנות אלינו להארכה.</p><button class="s" id="lo">התנתקות</button>`);$('#lo').onclick=logout;}
+// Paywall + plans. Both options always shown; 'בקרוב' unless the server says payments are enabled (currently only PAYMENTS_MODE=mock = simulation, no real money, no card fields).
+// Crisis hotlines (HOT) are always on this screen: the crisis path is never gated.
+let pay=null;const fmtP=a=>'₪'+(a/100).toLocaleString('he-IL');
+async function payInfo(){if(pay)return pay;try{pay=await fetch('/api/payments').then(r=>r.json());}catch(e){pay={enabled:false,products:[]};}return pay;}
+async function plans(title){const p=await payInfo(),a=acc||{};const pr=id=>(p.products||[]).find(x=>x.id===id);const m=pr('monthly'),se=pr('session');
+ const btn=(id,t)=>p.enabled?`<button class="p" data-buy="${id}">${t}</button>`:`<button class="s" disabled>בקרוב</button>`;
+ const sub=a.subscription?`<p>✅ מנוי פעיל עד ${new Date(a.subscription.current_period_end).toLocaleDateString('he-IL')}${a.subscription.provider==='mock'?' (הדמיה)':''}</p>`:'';
+ el(`<h1>${title}</h1>${p.test?'<p class="mk">🧪 מצב בדיקה – הדמיית תשלום בלבד, לא נגבה כסף</p>':''}${sub}
+ <div class="pl"><b>📅 ${m?m.label:'מנוי חודשי'}</b>${m&&p.enabled?' · '+fmtP(m.amount)+' לחודש':''}<p>שיחות ללא הגבלה עם ביג ברדר + עד 2 העברות לאח גדול בחודש.</p>${btn('monthly','למנוי')}</div>
+ <div class="pl"><b>🧑‍🤝‍🧑 ${se?se.label:'שיחה עם אח גדול'}</b>${se&&p.enabled?' · '+fmtP(se.amount)+' לשיחה':''}<p>תשלום חד־פעמי לשיחה עם בן אדם, בלי מנוי. יש לך ${a.credits||0} קרדיטים.</p>${btn('session','לרכישת שיחה')}
+ ${(a.credits||0)>0&&!a.active?'<button class="s" id="useCr">בקשת שיחה עם אח גדול (קרדיט אחד)</button>':''}</div>
+ ${a.active?'<button class="s" id="back">חזרה לשיחה</button>':''}<button class="s" id="lo">התנתקות</button>`);
+ gate.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>checkout(b.dataset.buy));
+ const bk=$('#back');if(bk)bk.onclick=()=>{gate.style.display='none';};$('#lo').onclick=logout;
+ const uc=$('#useCr');if(uc)uc.onclick=async()=>{uc.disabled=true;const r=await sb.rpc('request_handoff',{});const ok=r.data&&r.data.ok;if(r.data&&r.data.status)acc=r.data.status;
+  alert(ok?'הבקשה נשלחה! אח גדול יחזור אליך תוך 24 שעות.':'לא ניתן לשלוח כרגע.');plans(acc&&acc.active?'מנוי ושיחות':'תקופת הניסיון הסתיימה');};}
+function paywall(){return plans('תקופת הניסיון הסתיימה');}
+// Simulated checkout: no card fields at all. The server (service role, PAYMENTS_MODE=mock) creates the subscription/credit.
+async function checkout(id){const p=await payInfo();const it=(p.products||[]).find(x=>x.id===id);if(!it||!p.enabled)return;
+ const idem=(crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
+ el(`<h1>תשלום – הדמיה</h1><p class="mk">🧪 מצב בדיקה: זה לא תשלום אמיתי. לא נדרשים פרטי כרטיס ולא נגבה כסף.</p>
+ <div class="pl"><b>${it.label}</b><p>סכום להדמיה: ${fmtP(it.amount)}${it.kind==='subscription'?' לחודש':''}</p></div>
+ <button class="p" id="pay">אישור תשלום (הדמיה)</button><button class="s" id="cx">ביטול</button>`);
+ $('#cx').onclick=()=>plans(acc&&acc.active?'מנוי ושיחות':'תקופת הניסיון הסתיימה');
+ $('#pay').onclick=async()=>{const b=$('#pay');b.disabled=true;b.textContent='מעבד...';try{const s=(await sb.auth.getSession()).data.session;
+  const r=await fetch('/api/payments',{method:'POST',headers:{Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify({product:id,idem})});
+  if(!r.ok)throw 0;await loadAccess();el(`<h1>✅ בוצע (הדמיה)</h1><p>${it.kind==='subscription'?'המנוי הופעל.':'נוסף קרדיט לשיחה עם אח גדול.'}</p><button class="p" id="go">המשך</button>`);
+  $('#go').onclick=()=>{if(acc&&acc.active)location.reload();else plans('תקופת הניסיון הסתיימה');};}
+  catch(e){b.disabled=false;b.textContent='אישור תשלום (הדמיה)';alert('משהו השתבש, נסה/י שוב.');}};}
 async function logout(){await sb.auth.signOut();location.reload();}
 async function after(){
  user=(await sb.auth.getUser()).data.user;if(!user)return login('up');
@@ -82,7 +110,7 @@ async function after(){
   const r=await fetch('/api/ai',{method:'POST',signal:c.signal,headers:{Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify(body)});clearTimeout(tm);
   if(r.status===402||r.status===401){window.BBAuth.aiCall=null;return null;}return r.ok?await r.json():null;}catch(e){return null;}};const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
  if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':(d==null?'':'נשארו '+d+' ימי ניסיון');
- const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);
+ const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);const pb=document.createElement('button');pb.textContent='💳 מנוי ושיחות';pb.onclick=()=>plans('מנוי ושיחות');menu.appendChild(pb);
   if(prof.is_admin){const ad=document.createElement('button');ad.textContent='🛠️ ניהול';ad.onclick=()=>location.href='/admin';menu.appendChild(ad);}}
 }
 // Handoff: the SERVER builds the summary from allowlisted onboarding fields and enforces the cap (RPC request_handoff).
@@ -90,7 +118,8 @@ async function after(){
 window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;
  const r=await sb.rpc('request_handoff',{theme:eng.s.topic||null,subtheme:eng.s.sub||null,stage:eng.s.stage||null,auto:!!(res&&res.auto),turns:eng.turns.length});
  if(r.error||!r.data)return;if(r.data.status)cacheHandoffs(r.data.status.handoffs);
- if(r.data.ok===false&&r.data.reason==='cap'&&window.bbBubble)window.bbBubble({text:'עדכון: הגעת למכסת ההעברות לגורם אנושי לתקופה הזו, אז הבקשה הזו לא נשלחה. נמשיך כאן ביחד. במצוקה? ער"ן 1201.',kind:'note'},'bot');}catch(e){}}};
+ if(r.data.status)acc=r.data.status;if(r.data.ok&&r.data.paid_with_credit&&window.bbBubble)window.bbBubble({text:'השתמשנו בקרדיט אחד לשיחה עם אח גדול. נשארו '+((r.data.status||{}).credits||0)+'.',kind:'note'},'bot');
+ if(r.data.ok===false&&(r.data.reason==='cap'||r.data.reason==='no_credit')&&window.bbBubble)window.bbBubble({text:'עדכון: הגעת למכסת ההעברות לגורם אנושי לתקופה הזו, אז הבקשה הזו לא נשלחה. אפשר לרכוש שיחה חד־פעמית בתפריט ⋮ ← "מנוי ושיחות". נמשיך כאן ביחד. במצוקה? ער"ן 1201.',kind:'note'},'bot');}catch(e){}}};
 (async()=>{el('<p>טוען...</p>');try{const c=await fetch('/api/config').then(r=>r.json());
  sb=window.supabase.createClient(c.url,c.anonKey);window.bbSupabase=sb;
  const s=(await sb.auth.getSession()).data.session;if(s)after();else login('up');}catch(e){el('<p>אין חיבור לשרת כרגע.</p>');}})();

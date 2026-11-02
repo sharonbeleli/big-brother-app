@@ -6,7 +6,7 @@ nav[hidden],#msg[hidden]{display:none}main{padding:12px;max-width:900px;margin:a
 input,select,textarea{padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:15px;margin:3px 0}button.a{border:0;background:#4f46e5;color:#fff;border-radius:8px;padding:8px 12px;margin:3px}
 .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}#msg{padding:20px;text-align:center}</style></head><body>
 <header><b>🛠️ ביג ברדר · ניהול</b><a href="/" style="color:#fff">לאפליקציה</a></header>
-<div id="msg">טוען...</div><nav id="nav" hidden><button data-t="users" class="on">משתמשים</button><button data-t="handoffs">תור העברות</button><button data-t="slots">לו״ז שיחות</button><button data-t="couns">יועצים</button></nav><main id="m"></main>
+<div id="msg">טוען...</div><nav id="nav" hidden><button data-t="users" class="on">משתמשים</button><button data-t="handoffs">תור העברות</button><button data-t="slots">לו״ז שיחות</button><button data-t="couns">יועצים</button><button data-t="pay">מנויים וקרדיטים</button></nav><main id="m"></main>
 <script src="/supabase.js"></script>
 <script>
 (async function(){const $=id=>document.getElementById(id),M=$('m');const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
@@ -40,6 +40,18 @@ const T={
    if(error)alert(error.message);if(pre_.handoff_id)await sb.from('handoffs').update({status:'scheduled'}).eq('id',pre_.handoff_id);T.slots();};
   M.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{const r=b.parentNode,o={};r.querySelectorAll('[data-f]').forEach(i=>o[i.dataset.f]=i.value||null);o.starts_at=new Date(o.starts_at).toISOString();const {error}=await sb.from('call_slots').update(o).eq('id',b.dataset.sv);alert(error?error.message:'נשמר');});
   M.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('למחוק?')){await sb.from('call_slots').delete().eq('id',b.dataset.del);T.slots();}});},
+ async pay(){const pf=(await sb.from('profiles').select('id,email,onboarding').order('created_at',{ascending:false})).data||[];
+  const subs=(await sb.from('subscriptions').select('*').order('current_period_end',{ascending:false})).data||[];const cr=(await sb.from('session_credits').select('*')).data||[];
+  const pu=(await sb.from('purchases').select('*').order('created_at',{ascending:false}).limit(30)).data||[];const now=Date.now();
+  M.innerHTML='<div class="c"><small>🧪 מצב הדמיה: כל המנויים/הקרדיטים כאן הם בדיקה בלבד – לא נגבה כסף.</small></div>'+pf.map(p=>{const s=subs.find(x=>x.user_id===p.id&&['active','past_due'].includes(x.status)&&new Date(x.current_period_end)>now);const c=(cr.find(x=>x.user_id===p.id)||{}).balance||0;
+  return `<div class="c"><b>${esc((p.onboarding||{}).name||'(ללא שם)')}</b> · ${esc(p.email)}<br><small>מנוי: ${s?'פעיל עד '+fmt(s.current_period_end)+' ('+esc(s.provider)+')':'אין'} · קרדיטים: <b>${c}</b></small>
+  <div class="row"><input type="number" value="30" min="1" max="365" style="width:70px" id="sd${p.id}"><button class="a" data-gs="${p.id}">הענק מנוי (ימים)</button><button class="a" style="background:#e11d48" data-rs="${p.id}">בטל מנוי</button>
+  <input type="number" value="1" style="width:60px" id="cd${p.id}"><button class="a" data-cr="${p.id}">עדכן קרדיטים (+/-)</button></div></div>`}).join('')+
+  '<div class="c"><b>רכישות אחרונות</b><br>'+(pu.map(x=>`<small>${fmt(x.created_at)} · ${esc((pf.find(p=>p.id===x.user_id)||{}).email)} · ${esc(x.kind)} ×${x.quantity} · ₪${(x.amount_agorot/100).toFixed(0)} · ${esc(x.provider)}${x.is_test?' · בדיקה':''}</small>`).join('<br>')||'<small>אין</small>')+'</div>';
+  const run=async(fn,args)=>{const {error}=await sb.rpc(fn,args);if(error)alert(error.message);T.pay();};
+  M.querySelectorAll('[data-gs]').forEach(b=>b.onclick=()=>run('admin_grant_subscription',{target:b.dataset.gs,days:parseInt($('sd'+b.dataset.gs).value,10)}));
+  M.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>confirm('לבטל את המנוי?')&&run('admin_revoke_subscription',{target:b.dataset.rs}));
+  M.querySelectorAll('[data-cr]').forEach(b=>b.onclick=()=>run('admin_adjust_credits',{target:b.dataset.cr,delta:parseInt($('cd'+b.dataset.cr).value,10)}));},
  async couns(){const {data}=await sb.from('counsellors').select('*').order('name');
   M.innerHTML=`<div class="c"><b>יועץ חדש</b><div class="row"><input id="cn" placeholder="שם"><input id="cp" placeholder="טלפון" dir="ltr"><input id="ce" placeholder="אימייל" dir="ltr"><button class="a" id="cadd">הוסף</button></div></div>`+
   (data||[]).map(x=>`<div class="c"><b>${esc(x.name)}</b> <small dir="ltr">${esc(x.phone)} ${esc(x.email)}</small> ${x.active?'':'(לא פעיל)'} <button class="a" data-tg="${x.id}" data-a="${x.active}">${x.active?'השבת':'הפעל'}</button></div>`).join('');
