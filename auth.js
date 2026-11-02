@@ -76,7 +76,11 @@ async function after(){
  // Fail-open on server error so the chat (and its client-side crisis layer) is never blocked by an outage; paywall only on an explicit server verdict.
  if(a&&a.active===false)return paywall();
  const d=a?a.days_left:null;
- gate.style.display='none';const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
+ gate.style.display='none';
+ // AI layer (server-side OpenAI via /api/ai). Only when the server explicitly says active; any failure -> null -> rule engine.
+ if(a&&a.active)window.BBAuth.aiCall=async body=>{try{const s=(await sb.auth.getSession()).data.session;if(!s)return null;const c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
+  const r=await fetch('/api/ai',{method:'POST',signal:c.signal,headers:{Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify(body)});clearTimeout(tm);
+  if(r.status===402||r.status===401){window.BBAuth.aiCall=null;return null;}return r.ok?await r.json():null;}catch(e){return null;}};const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
  if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':(d==null?'':'נשארו '+d+' ימי ניסיון');
  const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);
   if(prof.is_admin){const ad=document.createElement('button');ad.textContent='🛠️ ניהול';ad.onclick=()=>location.href='/admin';menu.appendChild(ad);}}

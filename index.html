@@ -446,6 +446,63 @@ form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom
   const api = { Engine, STAGES };
   if (isNode) module.exports = api; else root.BBEngine = api;
 })(this);
+</script><script>// Client AI orchestration. ORDER: rule engine (incl. client crisis layer) runs first in eng.handle();
+// this only runs on non-crisis results, can only ESCALATE to crisis, and on any failure returns the rule result unchanged.
+(function (root) {
+  const isNode = typeof module !== "undefined";
+  const BB = () => (isNode ? require("./safety.js") : root.BB);
+  const SKIP_STAGES = ["welcome", "acquaint", "crisis"];
+  const NONCONV_LIMIT = 3;
+  function withTimeout(p, ms) { return Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]); }
+  function profileOf(eng) { const p = (eng.mem && eng.mem.load && eng.mem.load()) || {}; const o = {};
+    for (const k of ["name", "ageRange", "occupation"]) if (p[k]) o[k] = String(p[k]); return o; }
+  function hist(eng) { return eng.aiHist || (eng.aiHist = []); }
+  function remember(eng, role, text) { const h = hist(eng); h.push({ role, text: String(text).slice(0, 600) }); if (h.length > 12) h.splice(0, h.length - 12); }
+  function escalate(eng, level) {
+    const B = BB(); eng.s.locked = true; eng.s.stage = "crisis";
+    return Object.assign(eng.out([{ text: B.crisisMessage(level, "self"), kind: "crisis" }]),
+      { crisis: { level, type: "self", source: "ai", hotlines: B.getHotlines(eng.country) } });
+  }
+  // r = rule-engine result for userText. call(body) -> Promise<json|null>. Never throws.
+  async function enhance(eng, userText, r, call, opts) {
+    opts = opts || {}; const ms = opts.timeoutMs || 6000;
+    try {
+      if (!call || !r || r.crisis || eng.s.locked) return r;            // rule crisis always wins, untouched
+      const v = String(userText || "");
+      if (/^(action|topic):/.test(v) || r.handoff || SKIP_STAGES.includes(r.stage)) { return r; }
+      remember(eng, "user", v);
+      const planned = r.messages.map(m => m.text).join("\n");
+      const base = { messages: hist(eng).slice(), profile: profileOf(eng), stage: r.stage, topic: eng.s.topic || "" };
+      const insightStep = r.messages.some(m => m.kind === "insight") && r.stage === "reflection";
+      const [t, ins] = await Promise.all([
+        withTimeout(Promise.resolve(call(Object.assign({ mode: "turn", planned }, base))).catch(() => null), ms),
+        insightStep ? withTimeout(Promise.resolve(call(Object.assign({ mode: "insight" }, base))).catch(() => null), ms + 4000) : null
+      ]);
+      // Second crisis layer: escalate only (max of levels), never de-escalate.
+      const lv = Math.max(t && t.ok ? Number(t.crisis) || 0 : 0, ins && ins.ok ? Number(ins.crisis) || 0 : 0);
+      if (lv > 0) return escalate(eng, Math.min(3, lv));
+      let out = r;
+      if (t && t.ok) {
+        if (t.person_type) eng.hidden.aiPersonType = t.person_type;    // internal only, never shown
+        eng.aiNonConv = t.converging === false ? (eng.aiNonConv || 0) + 1 : 0;
+        if (eng.aiNonConv >= NONCONV_LIMIT && ["questions", "reflection", "luck", "closing"].includes(r.stage)) {
+          eng.aiNonConv = 0; out = Object.assign(eng.handoff(true), { aiHandoff: true });
+        } else if (t.reply && !insightStep) {
+          const msgs = r.messages.slice(), i = msgs.length - 1;
+          if (i >= 0 && !msgs[i].kind && msgs[i].text !== BB().ELABORATE) { msgs[i] = Object.assign({}, msgs[i], { text: t.reply, ai: true }); out = Object.assign({}, r, { messages: msgs }); }
+        }
+      }
+      if (out === r && ins && ins.ok && ins.insight) {
+        const msgs = r.messages.map(m => m.kind === "insight" ? Object.assign({}, m, { text: ins.insight, ai: true }) : m);
+        out = Object.assign({}, r, { messages: msgs });
+      }
+      for (const m of out.messages) remember(eng, "bot", m.text);
+      return out;
+    } catch (e) { return r; }
+  }
+  const api = { enhance, NONCONV_LIMIT };
+  if (isNode) module.exports = api; else root.BBAI = api;
+})(this);
 </script>
 <script>
 (async function(){
@@ -469,7 +526,12 @@ function render(r){busy=busy.then(async()=>{chipsEl.innerHTML='';
     if(r.crisis&&r.crisis.hotlines&&(m.kind==='crisis'||r.crisis.reminder)){if(r.crisis.reminder)d.classList.add('crisis');hotlines(d,r.crisis.hotlines);d.dataset.level=r.crisis.level;}}
   (r.chips||[]).forEach(c=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=c.label;b.onclick=()=>send(c.value,c.label);chipsEl.appendChild(b);});
   setProgress(r);});return busy;}
-function send(v,label){if(!v)return;bubble({text:label||v},'me');const r=eng.handle(v);if(r.handoff&&r.handoff.ok&&window.BBAuth)window.BBAuth.onHandoff(eng,{auto:v!=='action:human'});window.bbLast=render(r);return window.bbLast;}
+function send(v,label){if(!v)return;bubble({text:label||v},'me');const r=eng.handle(v); // rules + client crisis layer FIRST, always
+ const A=window.BBAuth,ai=!r.crisis&&A&&A.aiCall&&window.BBAI;
+ const done=x=>{if(x.handoff&&x.handoff.ok&&A)A.onHandoff(eng,{auto:v!=='action:human'});return render(x);};
+ if(!ai){window.bbLast=done(r);return window.bbLast;}
+ const ty=document.createElement('div');ty.className='typing';ty.innerHTML='<i></i><i></i><i></i>';log.appendChild(ty);log.scrollTop=log.scrollHeight;
+ const e=eng;window.bbLast=BBAI.enhance(e,v,r,A.aiCall).catch(()=>r).then(x=>{ty.remove();return done(e===eng?x:r);});return window.bbLast;}
 window.bbSend=send;
 $('f').onsubmit=e=>{e.preventDefault();const v=t.value.trim();t.value='';send(v);};
 $('menuBtn').onclick=()=>$('menu').classList.toggle('open');
@@ -559,7 +621,11 @@ async function after(){
  // Fail-open on server error so the chat (and its client-side crisis layer) is never blocked by an outage; paywall only on an explicit server verdict.
  if(a&&a.active===false)return paywall();
  const d=a?a.days_left:null;
- gate.style.display='none';const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
+ gate.style.display='none';
+ // AI layer (server-side OpenAI via /api/ai). Only when the server explicitly says active; any failure -> null -> rule engine.
+ if(a&&a.active)window.BBAuth.aiCall=async body=>{try{const s=(await sb.auth.getSession()).data.session;if(!s)return null;const c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
+  const r=await fetch('/api/ai',{method:'POST',signal:c.signal,headers:{Authorization:'Bearer '+s.access_token,'Content-Type':'application/json'},body:JSON.stringify(body)});clearTimeout(tm);
+  if(r.status===402||r.status===401){window.BBAuth.aiCall=null;return null;}return r.ok?await r.json():null;}catch(e){return null;}};const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
  if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':(d==null?'':'נשארו '+d+' ימי ניסיון');
  const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);
   if(prof.is_admin){const ad=document.createElement('button');ad.textContent='🛠️ ניהול';ad.onclick=()=>location.href='/admin';menu.appendChild(ad);}}

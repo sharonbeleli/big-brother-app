@@ -7,3 +7,8 @@
 
 ## Remaining limitation
 The conversation engine runs fully client-side, so a modified client can still use the local engine after the trial ends. Real enforcement arrives once AI replies go through server endpoints that call `requireActive()`.
+
+## AI layer (2026-11-02) – /api/ai
+- Order: client rule engine + client crisis layer run first on every message; a rule crisis is rendered immediately and AI is never called. AI (`app/ai.js`) runs only on non-crisis results and can only escalate (crisis>0 → crisis screen + hotlines, session locked); it can never unlock/de-escalate.
+- `/api/ai`: POST only; `requireActive()` (401/402) before any paid work; per-user in-memory rate limit (8/min, 120/day, 10 insights/day; per warm instance); output caps 300 (turn) / 500 (insight) tokens; ≤12 messages × 600 chars; profile allowlist (name, ageRange, occupation, tone, length); `store:false` to OpenAI; no message text logged or persisted. Missing key → 503 → client falls back silently.
+- Models: small `gpt-6-luna` (turn: classify/convergence/2nd crisis layer/phrasing), strong `gpt-6.1-terra` (final insight). Override via AI_MODEL_SMALL / AI_MODEL_STRONG env.
