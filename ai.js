@@ -8,6 +8,15 @@
   function withTimeout(p, ms) { return Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]); }
   function profileOf(eng) { const p = (eng.mem && eng.mem.load && eng.mem.load()) || {}; const o = {};
     for (const k of ["name", "ageRange", "occupation"]) if (p[k]) o[k] = String(p[k]); return o; }
+  const PT = ["ability+motivation", "ability-only", "motivation-only"];
+  // Stabilise across turns: recency-weighted votes; type only set after 2 votes and kept unless another leads clearly.
+  function votePerson(eng, v) {
+    const h = eng.hidden; if (!PT.includes(v)) return h.aiPersonType || null;
+    const w = h.aiVotes || (h.aiVotes = {}); for (const k in w) w[k] *= 0.85; w[v] = (w[v] || 0) + 1;
+    h.aiVoteN = (h.aiVoteN || 0) + 1; const best = PT.reduce((a, b) => ((w[b] || 0) > (w[a] || 0) ? b : a));
+    if (h.aiVoteN >= 2 && (!h.aiPersonType || (w[best] || 0) > (w[h.aiPersonType] || 0) * 1.3)) h.aiPersonType = best;
+    return h.aiPersonType || null;
+  }
   function hist(eng) { return eng.aiHist || (eng.aiHist = []); }
   function remember(eng, role, text) { const h = hist(eng); h.push({ role, text: String(text).slice(0, 600) }); if (h.length > 12) h.splice(0, h.length - 12); }
   function escalate(eng, level) {
@@ -24,7 +33,7 @@
       if (/^(action|topic):/.test(v) || r.handoff || SKIP_STAGES.includes(r.stage)) { return r; }
       remember(eng, "user", v);
       const planned = r.messages.map(m => m.text).join("\n");
-      const base = { messages: hist(eng).slice(), profile: profileOf(eng), stage: r.stage, topic: eng.s.topic || "" };
+      const base = { messages: hist(eng).slice(), profile: profileOf(eng), stage: r.stage, topic: eng.s.topic || "", person_hint: eng.hidden.aiPersonType || undefined };
       const insightStep = r.messages.some(m => m.kind === "insight") && r.stage === "reflection";
       const [t, ins] = await Promise.all([
         withTimeout(Promise.resolve(call(Object.assign({ mode: "turn", planned }, base))).catch(() => null), ms),
@@ -35,7 +44,7 @@
       if (lv > 0) return escalate(eng, Math.min(3, lv));
       let out = r;
       if (t && t.ok) {
-        if (t.person_type) eng.hidden.aiPersonType = t.person_type;    // internal only, never shown
+        votePerson(eng, t.person_type);                                   // internal, session-only, never shown
         eng.aiNonConv = t.converging === false ? (eng.aiNonConv || 0) + 1 : 0;
         if (eng.aiNonConv >= NONCONV_LIMIT && ["questions", "reflection", "luck", "closing"].includes(r.stage)) {
           eng.aiNonConv = 0; out = Object.assign(eng.handoff(true), { aiHandoff: true });
@@ -52,6 +61,6 @@
       return out;
     } catch (e) { return r; }
   }
-  const api = { enhance, NONCONV_LIMIT };
+  const api = { enhance, votePerson, NONCONV_LIMIT };
   if (isNode) module.exports = api; else root.BBAI = api;
 })(this);

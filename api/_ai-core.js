@@ -11,10 +11,21 @@ const CFG = {
 const PROFILE_KEYS = ['name', 'ageRange', 'occupation', 'tone', 'length']; // general details only
 const STAGES = ['topic', 'questions', 'reflection', 'luck', 'closing', 'done'];
 const UNDERSTAND = ['short', 'answer', 'off_topic', 'anger', 'dont_know', 'question_to_bot'];
-const PTYPES = ['ability+motivation', 'ability-only', 'motivation-only'];
+const PTYPES = ['ability+motivation', 'ability-only', 'motivation-only', 'unknown'];
 
 // --- in-memory rate limiter (per warm serverless instance; best-effort) ---
 const buckets = new Map();
+// DB rate limit (RPC public.ai_rate_hit, atomic, RLS-protected). Returns true/false, or null on any DB error (=> in-memory fallback).
+async function dbRateHit(token, mode) {
+  try {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) return null;
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 3000);
+    const r = await fetch(process.env.SUPABASE_URL + '/rest/v1/rpc/ai_rate_hit', { method: 'POST', signal: ctl.signal,
+      headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_mode: mode }) }).finally(() => clearTimeout(t));
+    if (!r.ok) return null; const j = await r.json(); return typeof j.allowed === 'boolean' ? j.allowed : null;
+  } catch (e) { return null; }
+}
 function rateLimit(uid, mode, now) {
   const day = Math.floor(now / 864e5), min = Math.floor(now / 6e4);
   let b = buckets.get(uid);
@@ -33,11 +44,11 @@ function sanitize(body) {
     .map(m => ({ role: m && m.role === 'bot' ? 'bot' : 'user', text: str(m && m.text, CFG.maxMsgChars) })).filter(m => m.text);
   const p = body.profile && typeof body.profile === 'object' ? body.profile : {}, profile = {};
   for (const k of PROFILE_KEYS) if (typeof p[k] === 'string' && p[k]) profile[k] = str(p[k], 30);
-  return { mode, msgs, profile, planned: str(body.planned, 400), stage: STAGES.includes(body.stage) ? body.stage : 'questions', topic: str(body.topic, 20).replace(/[^a-z_]/g, '') };
+  return { mode, msgs, profile, planned: str(body.planned, 400), stage: STAGES.includes(body.stage) ? body.stage : 'questions', topic: str(body.topic, 20).replace(/[^a-z_]/g, ''), personHint: PTYPES.includes(body.person_hint) && body.person_hint !== 'unknown' ? body.person_hint : null };
 }
 function buildInput(s) {
   const conv = s.msgs.map(m => (m.role === 'bot' ? 'בוט: ' : 'משתמש: ') + m.text).join('\n');
-  return 'פרופיל כללי: ' + JSON.stringify(s.profile) + '\nנושא: ' + s.topic + '\nשלב: ' + s.stage +
+  return 'פרופיל כללי: ' + JSON.stringify(s.profile) + '\nנושא: ' + s.topic + '\nשלב: ' + s.stage + (s.personHint ? '\nסוג אדם (פנימי, מצטבר): ' + s.personHint : '') +
     (s.mode === 'turn' ? '\nplanned: ' + s.planned : '') + '\n--- שיחה ---\n' + conv + '\n--- החזר JSON בלבד ---';
 }
 function outText(j) {
@@ -80,7 +91,10 @@ async function handle(req, res, deps) {
   let body = req.body; if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   const s = sanitize(body);
   if (!s.msgs.length) { res.status(400).send('{"error":"empty"}'); return; }
-  if (!rateLimit(uid, s.mode, now)) { res.status(429).send('{"error":"rate_limited"}'); return; }
+  const rateHit = deps.rateHit || dbRateHit;
+  let allowed = await rateHit(require('./_access.js').tokenOf(req), s.mode);
+  if (allowed === null) allowed = rateLimit(uid, s.mode, now);       // DB error => in-memory fallback
+  if (!allowed) { res.status(429).send('{"error":"rate_limited"}'); return; }
   const input = buildInput(s);
   const r = s.mode === 'insight'
     ? await callOpenAI(fetchFn, CFG.strong(), PROMPTS.insight, input, CFG.maxOut.insight)
@@ -89,4 +103,4 @@ async function handle(req, res, deps) {
   const out = s.mode === 'insight' ? shapeInsight(r.data) : shapeTurn(r.data);
   res.status(200).send(JSON.stringify(Object.assign({ ok: true, mode: s.mode, model: s.mode === 'insight' ? CFG.strong() : CFG.small(), usage: r.usage }, out)));
 }
-module.exports = { handle, sanitize, rateLimit, shapeTurn, shapeInsight, buildInput, CFG, _buckets: buckets };
+module.exports = { dbRateHit, handle, sanitize, rateLimit, shapeTurn, shapeInsight, buildInput, CFG, _buckets: buckets };
