@@ -38,20 +38,20 @@ function sanitize(body) {
 function buildInput(s) {
   const conv = s.msgs.map(m => (m.role === 'bot' ? 'בוט: ' : 'משתמש: ') + m.text).join('\n');
   return 'פרופיל כללי: ' + JSON.stringify(s.profile) + '\nנושא: ' + s.topic + '\nשלב: ' + s.stage +
-    (s.mode === 'turn' ? '\nplanned: ' + s.planned : '') + '\n--- שיחה ---\n' + conv;
+    (s.mode === 'turn' ? '\nplanned: ' + s.planned : '') + '\n--- שיחה ---\n' + conv + '\n--- החזר JSON בלבד ---';
 }
 function outText(j) {
   if (typeof j.output_text === 'string') return j.output_text;
   for (const o of j.output || []) for (const c of o.content || []) if (c.type === 'output_text' && c.text) return c.text;
   return '';
 }
-async function callOpenAI(fetchFn, model, instructions, input, maxOut) {
+async function callOpenAI(fetchFn, model, instructions, input, maxOut, extra) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), CFG.timeoutMs);
   try {
     const r = await fetchFn('https://api.openai.com/v1/responses', { method: 'POST', signal: ctl.signal,
       headers: { Authorization: 'Bearer ' + process.env.OPENAI_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, instructions, input, max_output_tokens: maxOut, store: false, text: { format: { type: 'json_object' } } }) });
-    if (!r.ok) return { error: 'openai_' + r.status };
+      body: JSON.stringify(Object.assign({ model, instructions, input, max_output_tokens: maxOut, store: false, text: { format: { type: 'json_object' } } }, extra || {})) });
+    if (!r.ok) { let c = ''; try { const e = await r.json(); c = (e.error && (e.error.code || e.error.param || e.error.type)) || ''; } catch (x) {} return { error: 'openai_' + r.status + (c ? ':' + String(c).slice(0, 60) : '') }; }
     const j = await r.json();
     let data; try { data = JSON.parse(outText(j)); } catch (e) { return { error: 'bad_json', usage: j.usage }; }
     return { data, usage: j.usage ? { input_tokens: j.usage.input_tokens, output_tokens: j.usage.output_tokens } : null };
@@ -84,7 +84,7 @@ async function handle(req, res, deps) {
   const input = buildInput(s);
   const r = s.mode === 'insight'
     ? await callOpenAI(fetchFn, CFG.strong(), PROMPTS.insight, input, CFG.maxOut.insight)
-    : await callOpenAI(fetchFn, CFG.small(), PROMPTS.turn, input, CFG.maxOut.turn);
+    : await callOpenAI(fetchFn, CFG.small(), PROMPTS.turn, input, CFG.maxOut.turn, { reasoning: { effort: 'low' } });
   if (r.error) { console.warn('ai_error', r.error); res.status(502).send(JSON.stringify({ error: 'ai_failed' })); return; } // no content logged
   const out = s.mode === 'insight' ? shapeInsight(r.data) : shapeTurn(r.data);
   res.status(200).send(JSON.stringify(Object.assign({ ok: true, mode: s.mode, model: s.mode === 'insight' ? CFG.strong() : CFG.small(), usage: r.usage }, out)));
