@@ -85,7 +85,7 @@ $('newBtn').onclick=()=>{$('menu').classList.remove('open');send('action:new','�
 $('humanBtn').onclick=()=>{$('menu').classList.remove('open');send('action:human','לדבר עם בן אדם');};
 $('cc').onchange=()=>{eng.country=$('cc').value;};
 $('forgetBtn').onclick=()=>{$('menu').classList.remove('open');memory.forget();log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;bubble({text:'מחקתי את כל מה שזכרתי עליך.'},'m note');window.bbLast=render(eng.start());};
-window.bbRestart=()=>{log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;window.bbLast=render(eng.start());};
+window.bbBubble=(m,c)=>bubble(m,c);window.bbRestart=()=>{log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;window.bbLast=render(eng.start());};
 window.bbReady=render(eng.start());
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')&&!window.BB_CONTENT)navigator.serviceWorker.register('sw.js');
 })();

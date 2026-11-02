@@ -326,7 +326,15 @@ form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom
   P.st_topic = function (raw, t) {
     const F = this.C.flows; let k = raw.startsWith("topic:") ? raw.slice(6) : null;
     if (!k) for (const key of Object.keys(F.topics)) if (t.includes(norm(F.topics[key].label.split(" ")[0]))) k = key;
-    if (!k || !F.topics[k]) return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips());
+    if (!k || !F.topics[k]) k = this.guessTopic(t);
+    if (!k || !F.topics[k]) {
+      // "don't know" here counts toward auto-handoff exactly like in the questions stages (3 short "don't know"s).
+      if (has(t, DONTKNOW) && words(raw) <= 3) { this.s.dk = (this.s.dk || 0) + 1; if (this.s.dk >= 3) { this.s.dk = 0; this.s.topicMiss = 0; return this.handoff(true); } }
+      else if (raw.startsWith("topic:") || words(raw) === 0 || this.s.topicMiss) k = "other"; // free text: ask once with options, then go with "other"
+      if (!k) { this.s.topicMiss = (this.s.topicMiss || 0) + 1;
+        return this.out([{ text: this.s.topicMiss > 1 ? this.pick(F.ask_topic) : "לא בטוח שהבנתי לאיזה כיוון. תבחר/י אחד מהנושאים, או פשוט \"משהו אחר\" ונתחיל משם:" }], this.topicChips()); }
+    }
+    this.s.topicMiss = 0;
     this.s.topic = k; this.s.qi = 0; this.s.elab = 0; this.s.answers = {}; this.s.stage = "questions";
     this.s.usedCases = []; this.s.detourDone = false; this.s.inDetour = false; this.s.say = [];
     const n = F.topics[k].questions.length, rest = [];
@@ -337,6 +345,17 @@ form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom
     const m = [], q = this.pick(F.topics[k].questions[0].t);
     if (this.rnd() < 0.4) { const c = this.bestCase(); if (c) { this.s.usedCases.push(c.id); m.push({ text: this.pick(F.moves.opening_example) + "\n" + c.analogy, kind: "analogy", caseId: c.id }); this.moves.push("example"); this.lastMove = "example"; } }
     m.push({ text: q }); return this.out(m);
+  };
+  // Map free text to the closest topic via topic labels + case keywords; null if nothing matches.
+  P.guessTopic = function (t) {
+    const F = this.C.flows, score = {};
+    for (const key of Object.keys(F.topics)) for (const w of F.topics[key].label.split(/[\s/]+/)) if (w.length > 2 && t.includes(norm(w))) score[key] = (score[key] || 0) + 2;
+    for (const c of this.C.cases || []) for (const kw of c.keywords || []) if (t.includes(norm(kw))) for (const tp of c.topics) if (F.topics[tp]) score[tp] = (score[tp] || 0) + 1 / c.topics.length;
+    const H = { career: ["עבודה","בוס","מנהל","משרה","ראיון","קריירה","קידום","משכורת","לימודים","תואר"], business: ["עסק","סטארטאפ","יזמות","לקוחות","שותף"],
+      relationship: ["זוג","זוגיות","דייט","פרידה","להיפרד","חבר שלי","חברה שלי","ריב","רבתי"], family: ["אמא","אבא","הורים","אח","אחות","משפחה","ילד"] };
+    for (const key in H) if (F.topics[key]) for (const w of H[key]) if (t.includes(norm(w))) score[key] = (score[key] || 0) + 1.5;
+    let best = null, bs = 0; for (const k in score) if (score[k] > bs) { bs = score[k]; best = k; }
+    return best;
   };
   P.elab = function () { const F = this.C.flows; this.s.elab++; if (!this.s.firstElab) { this.s.firstElab = true; this.used[F.elaborate[0]] = { seen: [0], last: 0 }; return this.out([{ text: F.elaborate[0] }]); } return this.out([{ text: this.pick(F.elaborate) }]); };
   P.rememberPhrase = function (raw) { const w = String(raw).replace(/["<>]/g, "").split(/\s+/).filter(Boolean); if (w.length >= 3) (this.s.say = this.s.say || []).push(w.slice(0, Math.min(5, w.length)).join(" ")); };
@@ -458,7 +477,7 @@ $('newBtn').onclick=()=>{$('menu').classList.remove('open');send('action:new','�
 $('humanBtn').onclick=()=>{$('menu').classList.remove('open');send('action:human','לדבר עם בן אדם');};
 $('cc').onchange=()=>{eng.country=$('cc').value;};
 $('forgetBtn').onclick=()=>{$('menu').classList.remove('open');memory.forget();log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;bubble({text:'מחקתי את כל מה שזכרתי עליך.'},'m note');window.bbLast=render(eng.start());};
-window.bbRestart=()=>{log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;window.bbLast=render(eng.start());};
+window.bbBubble=(m,c)=>bubble(m,c);window.bbRestart=()=>{log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;window.bbLast=render(eng.start());};
 window.bbReady=render(eng.start());
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')&&!window.BB_CONTENT)navigator.serviceWorker.register('sw.js');
 })();
@@ -523,7 +542,12 @@ function feed(a,restart){try{const m=BBMemory.createMemory(window.localStorage);
  if(a.name)p.name=a.name;if(a.ageRange)p.ageRange=a.ageRange;if(a.occupation)p.occupation=a.occupation;
  if(a.tone==='ישיר ותכל׳ס')p.preferredStyle='direction';if(a.tone==='תומך ורגוע')p.preferredStyle='validation';
  const cur=m.load()||{};if(Object.keys(p).some(k=>cur[k]!==p[k])||restart){m.save(p);if(window.bbRestart)window.bbRestart();}}catch(e){}}
-function daysLeft(){return Math.ceil((new Date(prof.trial_started_at).getTime()+prof.trial_days*864e5-Date.now())/864e5);}
+// Server is the source of truth for trial + handoff cap (SQL RPC access_status, computed from DB). Client never computes access itself.
+let acc=null;
+async function loadAccess(){try{const r=await sb.rpc('access_status');if(r.error||!r.data)return null;acc=r.data;cacheHandoffs(acc.handoffs);return acc;}catch(e){return null;}}
+// localStorage is only a cache of the server's handoff timestamps (used by the offline engine for instant UX).
+function cacheHandoffs(h){try{if(!h||!Array.isArray(h.timestamps))return;BBMemory.createMemory(window.localStorage).save({handoffs:h.timestamps});
+ if(window.bbEngine){window.bbEngine.handoffLog=h.timestamps.slice();window.bbEngine.handoffCfg=Object.assign({},window.bbEngine.handoffCfg||{},{max_handoffs_per_user:h.max,window_days:h.window_days,response_time_hours:h.response_time_hours});}}catch(e){}}
 function paywall(){el(`<h1>תקופת הניסיון הסתיימה</h1><p>תודה שניסית את ביג ברדר! 💜</p><h1 style="font-size:20px">תשלום יגיע בקרוב</h1><p>אנחנו עובדים על אפשרות מנוי. בינתיים אפשר לפנות אלינו להארכה.</p><button class="s" id="lo">התנתקות</button>`);$('#lo').onclick=logout;}
 async function logout(){await sb.auth.signOut();location.reload();}
 async function after(){
@@ -531,19 +555,21 @@ async function after(){
  const b=await api('/api/bootstrap',{method:'POST'});prof=b.profile;if(!prof){el('<p>שגיאה בטעינת הפרופיל, נסה/י לרענן.</p>');return;}
  if(!prof.onboarding_done)return onboarding();
  feed(prof.onboarding||{},false);
- const d=daysLeft();if(d<=0&&!prof.is_admin)return paywall();
+ const a=await loadAccess();
+ // Fail-open on server error so the chat (and its client-side crisis layer) is never blocked by an outage; paywall only on an explicit server verdict.
+ if(a&&a.active===false)return paywall();
+ const d=a?a.days_left:null;
  gate.style.display='none';const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
- if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':'נשארו '+d+' ימי ניסיון';
+ if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':(d==null?'':'נשארו '+d+' ימי ניסיון');
  const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);
   if(prof.is_admin){const ad=document.createElement('button');ad.textContent='🛠️ ניהול';ad.onclick=()=>location.href='/admin';menu.appendChild(ad);}}
 }
-// Handoff: store a SHORT neutral summary server-side (admin-only). No free text from the conversation.
-const TOPIC={career:'קריירה',business:'עסק',relationship:'זוגיות',family:'משפחה',other:'אחר'};
-window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;const o=(prof&&prof.onboarding)||{};
- const summary={profile:{name:o.name||null,ageRange:o.ageRange||null,occupation:o.occupation||null,tone:o.tone||null},
-  theme:TOPIC[eng.s.topic]||null,subtheme:eng.s.sub||null,stage:eng.s.stage,auto:!!(res&&res.auto),turns:eng.turns.length,
-  note:'המשתמש/ת ביקש/ה לדבר עם בן אדם'+(eng.s.topic?' בנושא '+(TOPIC[eng.s.topic]||''):'')};
- await sb.from('handoffs').insert({user_id:user.id,summary});}catch(e){}}};
+// Handoff: the SERVER builds the summary from allowlisted onboarding fields and enforces the cap (RPC request_handoff).
+// The client only sends enum metadata (topic key, sub key, stage, auto flag, turn count) - never conversation text.
+window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;
+ const r=await sb.rpc('request_handoff',{theme:eng.s.topic||null,subtheme:eng.s.sub||null,stage:eng.s.stage||null,auto:!!(res&&res.auto),turns:eng.turns.length});
+ if(r.error||!r.data)return;if(r.data.status)cacheHandoffs(r.data.status.handoffs);
+ if(r.data.ok===false&&r.data.reason==='cap'&&window.bbBubble)window.bbBubble({text:'עדכון: הגעת למכסת ההעברות לגורם אנושי לתקופה הזו, אז הבקשה הזו לא נשלחה. נמשיך כאן ביחד. במצוקה? ער"ן 1201.',kind:'note'},'bot');}catch(e){}}};
 (async()=>{el('<p>טוען...</p>');try{const c=await fetch('/api/config').then(r=>r.json());
  sb=window.supabase.createClient(c.url,c.anonKey);window.bbSupabase=sb;
  const s=(await sb.auth.getSession()).data.session;if(s)after();else login('up');}catch(e){el('<p>אין חיבור לשרת כרגע.</p>');}})();

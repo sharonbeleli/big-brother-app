@@ -59,7 +59,12 @@ function feed(a,restart){try{const m=BBMemory.createMemory(window.localStorage);
  if(a.name)p.name=a.name;if(a.ageRange)p.ageRange=a.ageRange;if(a.occupation)p.occupation=a.occupation;
  if(a.tone==='ישיר ותכל׳ס')p.preferredStyle='direction';if(a.tone==='תומך ורגוע')p.preferredStyle='validation';
  const cur=m.load()||{};if(Object.keys(p).some(k=>cur[k]!==p[k])||restart){m.save(p);if(window.bbRestart)window.bbRestart();}}catch(e){}}
-function daysLeft(){return Math.ceil((new Date(prof.trial_started_at).getTime()+prof.trial_days*864e5-Date.now())/864e5);}
+// Server is the source of truth for trial + handoff cap (SQL RPC access_status, computed from DB). Client never computes access itself.
+let acc=null;
+async function loadAccess(){try{const r=await sb.rpc('access_status');if(r.error||!r.data)return null;acc=r.data;cacheHandoffs(acc.handoffs);return acc;}catch(e){return null;}}
+// localStorage is only a cache of the server's handoff timestamps (used by the offline engine for instant UX).
+function cacheHandoffs(h){try{if(!h||!Array.isArray(h.timestamps))return;BBMemory.createMemory(window.localStorage).save({handoffs:h.timestamps});
+ if(window.bbEngine){window.bbEngine.handoffLog=h.timestamps.slice();window.bbEngine.handoffCfg=Object.assign({},window.bbEngine.handoffCfg||{},{max_handoffs_per_user:h.max,window_days:h.window_days,response_time_hours:h.response_time_hours});}}catch(e){}}
 function paywall(){el(`<h1>תקופת הניסיון הסתיימה</h1><p>תודה שניסית את ביג ברדר! 💜</p><h1 style="font-size:20px">תשלום יגיע בקרוב</h1><p>אנחנו עובדים על אפשרות מנוי. בינתיים אפשר לפנות אלינו להארכה.</p><button class="s" id="lo">התנתקות</button>`);$('#lo').onclick=logout;}
 async function logout(){await sb.auth.signOut();location.reload();}
 async function after(){
@@ -67,19 +72,21 @@ async function after(){
  const b=await api('/api/bootstrap',{method:'POST'});prof=b.profile;if(!prof){el('<p>שגיאה בטעינת הפרופיל, נסה/י לרענן.</p>');return;}
  if(!prof.onboarding_done)return onboarding();
  feed(prof.onboarding||{},false);
- const d=daysLeft();if(d<=0&&!prof.is_admin)return paywall();
+ const a=await loadAccess();
+ // Fail-open on server error so the chat (and its client-side crisis layer) is never blocked by an outage; paywall only on an explicit server verdict.
+ if(a&&a.active===false)return paywall();
+ const d=a?a.days_left:null;
  gate.style.display='none';const t=document.querySelector('.title small');let bd=document.getElementById('trialBadge');
- if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':'נשארו '+d+' ימי ניסיון';
+ if(!bd){bd=document.createElement('span');bd.id='trialBadge';t.appendChild(bd);}bd.textContent=prof.is_admin?'מנהל':(d==null?'':'נשארו '+d+' ימי ניסיון');
  const menu=document.getElementById('menu');if(!document.getElementById('logoutBtn')){const lo=document.createElement('button');lo.id='logoutBtn';lo.textContent='🚪 התנתקות';lo.onclick=logout;menu.appendChild(lo);
   if(prof.is_admin){const ad=document.createElement('button');ad.textContent='🛠️ ניהול';ad.onclick=()=>location.href='/admin';menu.appendChild(ad);}}
 }
-// Handoff: store a SHORT neutral summary server-side (admin-only). No free text from the conversation.
-const TOPIC={career:'קריירה',business:'עסק',relationship:'זוגיות',family:'משפחה',other:'אחר'};
-window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;const o=(prof&&prof.onboarding)||{};
- const summary={profile:{name:o.name||null,ageRange:o.ageRange||null,occupation:o.occupation||null,tone:o.tone||null},
-  theme:TOPIC[eng.s.topic]||null,subtheme:eng.s.sub||null,stage:eng.s.stage,auto:!!(res&&res.auto),turns:eng.turns.length,
-  note:'המשתמש/ת ביקש/ה לדבר עם בן אדם'+(eng.s.topic?' בנושא '+(TOPIC[eng.s.topic]||''):'')};
- await sb.from('handoffs').insert({user_id:user.id,summary});}catch(e){}}};
+// Handoff: the SERVER builds the summary from allowlisted onboarding fields and enforces the cap (RPC request_handoff).
+// The client only sends enum metadata (topic key, sub key, stage, auto flag, turn count) - never conversation text.
+window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;
+ const r=await sb.rpc('request_handoff',{theme:eng.s.topic||null,subtheme:eng.s.sub||null,stage:eng.s.stage||null,auto:!!(res&&res.auto),turns:eng.turns.length});
+ if(r.error||!r.data)return;if(r.data.status)cacheHandoffs(r.data.status.handoffs);
+ if(r.data.ok===false&&r.data.reason==='cap'&&window.bbBubble)window.bbBubble({text:'עדכון: הגעת למכסת ההעברות לגורם אנושי לתקופה הזו, אז הבקשה הזו לא נשלחה. נמשיך כאן ביחד. במצוקה? ער"ן 1201.',kind:'note'},'bot');}catch(e){}}};
 (async()=>{el('<p>טוען...</p>');try{const c=await fetch('/api/config').then(r=>r.json());
  sb=window.supabase.createClient(c.url,c.anonKey);window.bbSupabase=sb;
  const s=(await sb.auth.getSession()).data.session;if(s)after();else login('up');}catch(e){el('<p>אין חיבור לשרת כרגע.</p>');}})();

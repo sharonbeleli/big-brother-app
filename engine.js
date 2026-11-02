@@ -134,7 +134,15 @@
   P.st_topic = function (raw, t) {
     const F = this.C.flows; let k = raw.startsWith("topic:") ? raw.slice(6) : null;
     if (!k) for (const key of Object.keys(F.topics)) if (t.includes(norm(F.topics[key].label.split(" ")[0]))) k = key;
-    if (!k || !F.topics[k]) return this.out([{ text: this.pick(F.ask_topic) }], this.topicChips());
+    if (!k || !F.topics[k]) k = this.guessTopic(t);
+    if (!k || !F.topics[k]) {
+      // "don't know" here counts toward auto-handoff exactly like in the questions stages (3 short "don't know"s).
+      if (has(t, DONTKNOW) && words(raw) <= 3) { this.s.dk = (this.s.dk || 0) + 1; if (this.s.dk >= 3) { this.s.dk = 0; this.s.topicMiss = 0; return this.handoff(true); } }
+      else if (raw.startsWith("topic:") || words(raw) === 0 || this.s.topicMiss) k = "other"; // free text: ask once with options, then go with "other"
+      if (!k) { this.s.topicMiss = (this.s.topicMiss || 0) + 1;
+        return this.out([{ text: this.s.topicMiss > 1 ? this.pick(F.ask_topic) : "לא בטוח שהבנתי לאיזה כיוון. תבחר/י אחד מהנושאים, או פשוט \"משהו אחר\" ונתחיל משם:" }], this.topicChips()); }
+    }
+    this.s.topicMiss = 0;
     this.s.topic = k; this.s.qi = 0; this.s.elab = 0; this.s.answers = {}; this.s.stage = "questions";
     this.s.usedCases = []; this.s.detourDone = false; this.s.inDetour = false; this.s.say = [];
     const n = F.topics[k].questions.length, rest = [];
@@ -145,6 +153,17 @@
     const m = [], q = this.pick(F.topics[k].questions[0].t);
     if (this.rnd() < 0.4) { const c = this.bestCase(); if (c) { this.s.usedCases.push(c.id); m.push({ text: this.pick(F.moves.opening_example) + "\n" + c.analogy, kind: "analogy", caseId: c.id }); this.moves.push("example"); this.lastMove = "example"; } }
     m.push({ text: q }); return this.out(m);
+  };
+  // Map free text to the closest topic via topic labels + case keywords; null if nothing matches.
+  P.guessTopic = function (t) {
+    const F = this.C.flows, score = {};
+    for (const key of Object.keys(F.topics)) for (const w of F.topics[key].label.split(/[\s/]+/)) if (w.length > 2 && t.includes(norm(w))) score[key] = (score[key] || 0) + 2;
+    for (const c of this.C.cases || []) for (const kw of c.keywords || []) if (t.includes(norm(kw))) for (const tp of c.topics) if (F.topics[tp]) score[tp] = (score[tp] || 0) + 1 / c.topics.length;
+    const H = { career: ["עבודה","בוס","מנהל","משרה","ראיון","קריירה","קידום","משכורת","לימודים","תואר"], business: ["עסק","סטארטאפ","יזמות","לקוחות","שותף"],
+      relationship: ["זוג","זוגיות","דייט","פרידה","להיפרד","חבר שלי","חברה שלי","ריב","רבתי"], family: ["אמא","אבא","הורים","אח","אחות","משפחה","ילד"] };
+    for (const key in H) if (F.topics[key]) for (const w of H[key]) if (t.includes(norm(w))) score[key] = (score[key] || 0) + 1.5;
+    let best = null, bs = 0; for (const k in score) if (score[k] > bs) { bs = score[k]; best = k; }
+    return best;
   };
   P.elab = function () { const F = this.C.flows; this.s.elab++; if (!this.s.firstElab) { this.s.firstElab = true; this.used[F.elaborate[0]] = { seen: [0], last: 0 }; return this.out([{ text: F.elaborate[0] }]); } return this.out([{ text: this.pick(F.elaborate) }]); };
   P.rememberPhrase = function (raw) { const w = String(raw).replace(/["<>]/g, "").split(/\s+/).filter(Boolean); if (w.length >= 3) (this.s.say = this.s.say || []).push(w.slice(0, Math.min(5, w.length)).join(" ")); };
