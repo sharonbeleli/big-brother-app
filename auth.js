@@ -1,6 +1,7 @@
 // Auth + onboarding + trial gate (Supabase). Runs AFTER safety/engine are loaded; never touches the crisis layer.
 (function(){
-if(window.BB_TEST||location.protocol==='file:'||!window.supabase)return; // offline/test builds: no gate
+if(window.BB_TEST||!/^https?:$/.test(location.protocol))return; // offline/test builds: no gate
+function boot(){
 const Q=[
  {k:'name',q:'איך לקרוא לך? (שם או כינוי)',type:'text'},
  {k:'ageRange',q:'בן/בת כמה את/ה?',opts:['מתחת ל-18','18–21','22–26','27–35','35+']},
@@ -82,4 +83,6 @@ window.BBAuth={onHandoff:async function(eng,res){try{if(!sb||!user)return;const 
 (async()=>{el('<p>טוען...</p>');try{const c=await fetch('/api/config').then(r=>r.json());
  sb=window.supabase.createClient(c.url,c.anonKey);window.bbSupabase=sb;
  const s=(await sb.auth.getSession()).data.session;if(s)after();else login('up');}catch(e){el('<p>אין חיבור לשרת כרגע.</p>');}})();
+}
+const sc=document.createElement('script');sc.src='/supabase.js';sc.onload=boot;sc.onerror=()=>{};document.head.appendChild(sc);
 })();
