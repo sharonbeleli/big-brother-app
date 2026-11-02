@@ -1,0 +1,51 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ביג ברדר · ניהול</title><meta name="robots" content="noindex">
+<style>body{font-family:system-ui,Arial,sans-serif;margin:0;background:#f4f5fb;color:#111827}header{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center}
+header b{flex:1;font-size:18px}nav{display:flex;gap:6px;padding:8px;overflow:auto;background:#fff;border-bottom:1px solid #e5e7eb}nav button{border:0;background:#eef2ff;color:#3730a3;border-radius:999px;padding:8px 14px;font-weight:600}nav button.on{background:#4f46e5;color:#fff}
+main{padding:12px;max-width:900px;margin:auto}.c{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin:8px 0}.c small{color:#6b7280}
+input,select,textarea{padding:8px;border:1px solid #e5e7eb;border-radius:8px;font-size:15px;margin:3px 0}button.a{border:0;background:#4f46e5;color:#fff;border-radius:8px;padding:8px 12px;margin:3px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}#msg{padding:20px;text-align:center}</style></head><body>
+<header><b>🛠️ ביג ברדר · ניהול</b><a href="/" style="color:#fff">לאפליקציה</a></header>
+<div id="msg">טוען...</div><nav id="nav" hidden><button data-t="users" class="on">משתמשים</button><button data-t="handoffs">תור העברות</button><button data-t="slots">לו״ז שיחות</button><button data-t="couns">יועצים</button></nav><main id="m"></main>
+<script src="/supabase.js"></script>
+<script>
+(async function(){const $=id=>document.getElementById(id),M=$('m');const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const c=await fetch('/api/config').then(r=>r.json());const sb=supabase.createClient(c.url,c.anonKey);
+const u=(await sb.auth.getUser()).data.user;
+if(!u){$('msg').innerHTML='צריך להתחבר קודם. <a href="/">כניסה</a>';return;}
+const me=(await sb.from('profiles').select('is_admin').eq('id',u.id).single()).data;
+if(!me||!me.is_admin){$('msg').textContent='⛔ אין הרשאה. האזור מיועד למנהלים בלבד.';document.title='אין הרשאה';return;}
+$('msg').hidden=true;$('nav').hidden=false;let counsellors=[];
+const fmt=d=>new Date(d).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+const left=p=>Math.ceil((new Date(p.trial_started_at).getTime()+p.trial_days*864e5-Date.now())/864e5);
+const T={
+ async users(){const {data}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
+  M.innerHTML=(data||[]).map(p=>{const o=p.onboarding||{};const d=left(p);return `<div class="c"><b>${esc(o.name||'(ללא שם)')}</b> · ${esc(p.email)} ${p.is_admin?'· <b>מנהל</b>':''}<br><small>${esc([o.ageRange,o.gender,o.occupation,o.living,o.tone,o.length,(o.interests||[]).join('/')].filter(Boolean).join(' · '))}</small><br>
+  <small>נרשם: ${fmt(p.created_at)} · ניסיון: ${d>0?'נשארו '+d+' ימים':'<b style="color:#e11d48">פג</b>'} (${p.trial_days} ימים)</small>
+  <div class="row"><input type="number" value="7" min="1" style="width:70px" id="x${p.id}"><button class="a" data-ext="${p.id}">הארך ניסיון</button></div></div>`}).join('')||'אין משתמשים';
+  M.querySelectorAll('[data-ext]').forEach(b=>b.onclick=async()=>{const n=parseInt($('x'+b.dataset.ext).value,10);const {error}=await sb.rpc('admin_extend_trial',{target:b.dataset.ext,extra_days:n});if(error)alert(error.message);T.users();});},
+ async handoffs(){const {data}=await sb.from('handoffs').select('*').order('created_at',{ascending:false});const pr=(await sb.from('profiles').select('id,email')).data||[];
+  M.innerHTML=(data||[]).map(h=>{const s=h.summary||{},p=s.profile||{};return `<div class="c"><b>${esc(p.name||'—')}</b> <small>${esc((pr.find(x=>x.id===h.user_id)||{}).email)} · ${fmt(h.created_at)}</small><br>
+  ${esc(s.note)}<br><small>${esc([p.ageRange,p.occupation,p.tone].filter(Boolean).join(' · '))} · נושא: ${esc(s.theme||'—')}${s.subtheme?' / '+esc(s.subtheme):''} · ${s.auto?'הופנה אוטומטית':'ביקש/ה'}</small>
+  <div class="row"><select data-st="${h.id}">${['new','scheduled','done','closed'].map(x=>`<option ${x===h.status?'selected':''}>${x}</option>`).join('')}</select><button class="a" data-sch="${h.id}" data-u="${h.user_id}">קבע שיחה</button></div></div>`}).join('')||'התור ריק';
+  M.querySelectorAll('[data-st]').forEach(s=>s.onchange=()=>sb.from('handoffs').update({status:s.value}).eq('id',s.dataset.st));
+  M.querySelectorAll('[data-sch]').forEach(b=>b.onclick=()=>{T.slots({handoff_id:b.dataset.sch,user_id:b.dataset.u});go('slots',true);});},
+ async slots(pre){counsellors=(await sb.from('counsellors').select('*').order('name')).data||[];const pf=(await sb.from('profiles').select('id,email,onboarding')).data||[];
+  const {data}=await sb.from('call_slots').select('*').order('starts_at');const co=sel=>'<option value="">— יועץ —</option>'+counsellors.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>`).join('');
+  const us=sel=>'<option value="">— משתמש —</option>'+pf.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc((x.onboarding||{}).name||x.email)}</option>`).join('');
+  const pre_=pre&&pre.user_id?pre:{};M.innerHTML=`<div class="c"><b>משבצת חדשה</b><div class="row"><input type="datetime-local" id="ns"><input type="number" id="nd" value="30" style="width:70px"> דק׳ <select id="nc">${co()}</select><select id="nu">${us(pre_.user_id)}</select><button class="a" id="add">הוסף</button></div></div>`+
+  (data||[]).map(s=>`<div class="c"><div class="row"><input type="datetime-local" data-f="starts_at" value="${new Date(new Date(s.starts_at).getTime()-new Date(s.starts_at).getTimezoneOffset()*6e4).toISOString().slice(0,16)}"><select data-f="counsellor_id">${co(s.counsellor_id)}</select><select data-f="user_id">${us(s.user_id)}</select>
+  <select data-f="status">${['open','booked','done','cancelled','no_show'].map(x=>`<option ${x===s.status?'selected':''}>${x}</option>`).join('')}</select><input data-f="notes" placeholder="הערות" value="${esc(s.notes)}"><button class="a" data-sv="${s.id}">שמור</button><button class="a" style="background:#e11d48" data-del="${s.id}">מחק</button></div></div>`).join('');
+  $('add').onclick=async()=>{if(!$('ns').value)return alert('בחר/י מועד');const uid=$('nu').value||null;const {error}=await sb.from('call_slots').insert({starts_at:new Date($('ns').value).toISOString(),duration_min:+$('nd').value,counsellor_id:$('nc').value||null,user_id:uid,handoff_id:pre_.handoff_id||null,status:uid?'booked':'open'});
+   if(error)alert(error.message);if(pre_.handoff_id)await sb.from('handoffs').update({status:'scheduled'}).eq('id',pre_.handoff_id);T.slots();};
+  M.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async()=>{const r=b.parentNode,o={};r.querySelectorAll('[data-f]').forEach(i=>o[i.dataset.f]=i.value||null);o.starts_at=new Date(o.starts_at).toISOString();const {error}=await sb.from('call_slots').update(o).eq('id',b.dataset.sv);alert(error?error.message:'נשמר');});
+  M.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('למחוק?')){await sb.from('call_slots').delete().eq('id',b.dataset.del);T.slots();}});},
+ async couns(){const {data}=await sb.from('counsellors').select('*').order('name');
+  M.innerHTML=`<div class="c"><b>יועץ חדש</b><div class="row"><input id="cn" placeholder="שם"><input id="cp" placeholder="טלפון" dir="ltr"><input id="ce" placeholder="אימייל" dir="ltr"><button class="a" id="cadd">הוסף</button></div></div>`+
+  (data||[]).map(x=>`<div class="c"><b>${esc(x.name)}</b> <small dir="ltr">${esc(x.phone)} ${esc(x.email)}</small> ${x.active?'':'(לא פעיל)'} <button class="a" data-tg="${x.id}" data-a="${x.active}">${x.active?'השבת':'הפעל'}</button></div>`).join('');
+  $('cadd').onclick=async()=>{if(!$('cn').value)return;await sb.from('counsellors').insert({name:$('cn').value,phone:$('cp').value||null,email:$('ce').value||null});T.couns();};
+  M.querySelectorAll('[data-tg]').forEach(b=>b.onclick=async()=>{await sb.from('counsellors').update({active:b.dataset.a!=='true'}).eq('id',b.dataset.tg);T.couns();});}};
+function go(t,skip){[...$('nav').children].forEach(b=>b.classList.toggle('on',b.dataset.t===t));if(!skip)T[t]();}
+[...$('nav').children].forEach(b=>b.onclick=()=>go(b.dataset.t));go('users');
+})();
+</script></body></html>

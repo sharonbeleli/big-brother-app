@@ -55,6 +55,7 @@ form{display:flex;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom
 <div class="safety">במצוקה? ער"ן 1201 · מד"א 101 · משטרה 100</div>
 <form id="f"><input id="t" autocomplete="off" placeholder="כתוב הודעה..." aria-label="הודעה"><button id="send" aria-label="שלח">➤</button></form>
 <script src="safety.js"></script><script src="memory.js"></script><script src="engine.js"></script>
+<script src="supabase.js"></script>
 <script>
 (async function(){
 const $=id=>document.getElementById(id),log=$('log'),chipsEl=$('chips'),t=$('t');
@@ -77,7 +78,7 @@ function render(r){busy=busy.then(async()=>{chipsEl.innerHTML='';
     if(r.crisis&&r.crisis.hotlines&&(m.kind==='crisis'||r.crisis.reminder)){if(r.crisis.reminder)d.classList.add('crisis');hotlines(d,r.crisis.hotlines);d.dataset.level=r.crisis.level;}}
   (r.chips||[]).forEach(c=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=c.label;b.onclick=()=>send(c.value,c.label);chipsEl.appendChild(b);});
   setProgress(r);});return busy;}
-function send(v,label){if(!v)return;bubble({text:label||v},'me');window.bbLast=render(eng.handle(v));return window.bbLast;}
+function send(v,label){if(!v)return;bubble({text:label||v},'me');const r=eng.handle(v);if(r.handoff&&r.handoff.ok&&window.BBAuth)window.BBAuth.onHandoff(eng,{auto:v!=='action:human'});window.bbLast=render(r);return window.bbLast;}
 window.bbSend=send;
 $('f').onsubmit=e=>{e.preventDefault();const v=t.value.trim();t.value='';send(v);};
 $('menuBtn').onclick=()=>$('menu').classList.toggle('open');
@@ -85,7 +86,8 @@ $('newBtn').onclick=()=>{$('menu').classList.remove('open');send('action:new','�
 $('humanBtn').onclick=()=>{$('menu').classList.remove('open');send('action:human','לדבר עם בן אדם');};
 $('cc').onchange=()=>{eng.country=$('cc').value;};
 $('forgetBtn').onclick=()=>{$('menu').classList.remove('open');memory.forget();log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;bubble({text:'מחקתי את כל מה שזכרתי עליך.'},'m note');window.bbLast=render(eng.start());};
+window.bbRestart=()=>{log.innerHTML='';eng=new BBEngine.Engine({content:C,memory,country:$('cc').value});window.bbEngine=eng;window.bbLast=render(eng.start());};
 window.bbReady=render(eng.start());
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')&&!window.BB_CONTENT)navigator.serviceWorker.register('sw.js');
 })();
-</script></body></html>
+</script><script src="auth.js"></script></body></html>
