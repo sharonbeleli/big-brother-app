@@ -17,7 +17,7 @@
   }
   // r = rule-engine result for userText. call(body) -> Promise<json|null>. Never throws.
   async function enhance(eng, userText, r, call, opts) {
-    opts = opts || {}; const ms = opts.timeoutMs || 6000;
+    opts = opts || {}; const ms = opts.timeoutMs || 9000;
     try {
       if (!call || !r || r.crisis || eng.s.locked) return r;            // rule crisis always wins, untouched
       const v = String(userText || "");
